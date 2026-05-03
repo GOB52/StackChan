@@ -14,16 +14,14 @@
 #include <stackchan/stackchan.h>
 #include <apps/common/common.h>
 
-// 0 = DefaultAvatar (upstream), 1 = ponko ImageAvatar (StackChan fork by GOB)
+// 0 = DefaultAvatar (upstream), 1 = ImageAvatar from SD (StackChan fork by GOB)
+// Phase 1.5c.2+: ImageAvatar always loads from SD; on any failure
+// (no card / mount fail / JSON or PNG missing) falls back to DefaultAvatar.
 #define USE_PONKO_AVATAR 1
-
-// 0 = use C++ ponko_preset directly, 1 = load from avatar.json + ponko.json
-// (Phase 1.5a: JSON manifest with C++ preset fallback on any error)
-#define USE_AVATAR_JSON_CONFIG 1
 
 // Phase 1.5b on-device test: force NVS current_skin to a specific id at app open.
 // Empty string = no override. Useful to switch between "ponko"/"robot" without UI.
-#define FORCE_NVS_SKIN_ID "ponko"
+#define FORCE_NVS_SKIN_ID ""
 
 // 1 = cycle Neutral/Happy/Angry/Sad every 5s for emotion + decorator pipeline check
 #define ENABLE_EMOTION_TEST 1
@@ -32,18 +30,8 @@
 #define ENABLE_SPEAKING_TEST 1
 
 #if USE_PONKO_AVATAR
-#include <stackchan/avatar/skins/image/presets/ponko_preset.h>
-#if USE_AVATAR_JSON_CONFIG
 #include <stackchan/avatar/skins/image/skin_loader.h>
 // toast.h is already included via apps/common/common.h
-#endif
-#endif
-
-// Phase 1.5c.1: SD probe at app open. Logs only; no skin_loader integration yet.
-#define ENABLE_SD_PROBE_TEST 1
-#if ENABLE_SD_PROBE_TEST
-#include <hal/board/sd_guard.h>
-#include <dirent.h>
 #endif
 #include <string_view>
 #include <cstdint>
@@ -97,34 +85,6 @@ void AppAvatar::onOpen()
 {
     mclog::tagInfo(getAppInfo().name, "on open");
 
-#if ENABLE_SD_PROBE_TEST
-    // Phase 1.5c.1: probe SD card insertion + mount, then list /sdcard root.
-    // Verifies GPIO35 swap doesn't break LCD on either path (inserted/absent).
-    {
-        bool inserted = stackchan::hal::SdGuard::isInserted();
-        mclog::tagInfo(getAppInfo().name, "[SD probe] inserted={}", inserted);
-        if (inserted) {
-            stackchan::hal::SdGuard guard;
-            bool mounted = guard.ensureMounted();
-            mclog::tagInfo(getAppInfo().name, "[SD probe] mount={}", mounted);
-            if (mounted) {
-                DIR* d = opendir("/sdcard");
-                if (d) {
-                    int n = 0;
-                    while (auto* ent = readdir(d)) {
-                        mclog::tagInfo(getAppInfo().name, "[SD probe] /sdcard/{}", ent->d_name);
-                        if (++n >= 16) break;
-                    }
-                    closedir(d);
-                } else {
-                    mclog::tagError(getAppInfo().name, "[SD probe] opendir /sdcard failed");
-                }
-            }
-        }
-        mclog::tagInfo(getAppInfo().name, "[SD probe] back to LCD mode");
-    }
-#endif
-
     // Create loading page
     std::unique_ptr<view::LoadingPage> loading_page;
     {
@@ -144,10 +104,9 @@ void AppAvatar::onOpen()
     // Destroy loading page
     loading_page.reset();
 
-    // Create avatar (Default or ponko, switched via USE_PONKO_AVATAR)
-    std::string skin_load_error;  // populated only on JSON-config error so we can toast after attach
+    // Create avatar (DefaultAvatar or ImageAvatar from SD, switched via USE_PONKO_AVATAR)
+    std::string skin_load_error;  // populated only on SD load error → top toast after attach
 #if USE_PONKO_AVATAR
-#if USE_AVATAR_JSON_CONFIG
     {
         // Optional Phase 1.5b on-device test: write FORCE_NVS_SKIN_ID to NVS so the
         // loader picks it up on this run.
@@ -155,20 +114,14 @@ void AppAvatar::onOpen()
             avatar::image::set_current_skin_id_nvs(FORCE_NVS_SKIN_ID);
             mclog::tagInfo(getAppInfo().name, "FORCE_NVS_SKIN_ID applied: {}", FORCE_NVS_SKIN_ID);
         }
-        // JSON loader returns already-init()-ed avatar; on failure falls back to DefaultAvatar.
+        // SD-only loader: returns ImageAvatar on success, DefaultAvatar on any failure
+        // (no card / mount fail / JSON or PNG missing). error_message is populated on failure.
         auto skin = avatar::image::load_avatar_or_fallback(lv_screen_active());
         if (!skin.error_message.empty()) {
             skin_load_error = skin.error_message;
         }
         GetStackChan().attachAvatar(std::move(skin.avatar));
     }
-#else
-    {
-        auto avatar = avatar::image::make_ponko_avatar();
-        avatar->init(lv_screen_active());
-        GetStackChan().attachAvatar(std::move(avatar));
-    }
-#endif
 #else
     {
         auto avatar = std::make_unique<avatar::DefaultAvatar>();
@@ -318,7 +271,7 @@ void AppAvatar::onOpen()
     view::create_home_indicator([&]() { close(); }, 0xFF9ABC, 0x431525);
     view::create_status_bar(0xFF9ABC, 0x431525);
 
-#if USE_PONKO_AVATAR && USE_AVATAR_JSON_CONFIG
+#if USE_PONKO_AVATAR
     // Show top toast on skin-load failure (12s, same convention as WS errors).
     if (!skin_load_error.empty()) {
         view::pop_a_toast(skin_load_error, view::ToastType::Error, 12000);

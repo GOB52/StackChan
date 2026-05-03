@@ -2,10 +2,21 @@
 #include "image_avatar.h"
 #include "../../decorators/decorators.h"
 #include "../default/default.h"
-#include <assets/assets.h>
 #include <mooncake_log.h>
 #include <algorithm>
 #include <utility>
+
+namespace {
+// Build an LVGL image descriptor from PSRAM-resident PNG bytes (borrowed).
+void build_dsc_from_png(lv_image_dsc_t& dsc, const stackchan::avatar::image::PngBuffer& src)
+{
+    if (!src.valid()) return;
+    dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
+    dsc.header.cf    = LV_COLOR_FORMAT_RAW_ALPHA;
+    dsc.data_size    = src.size;
+    dsc.data         = src.bytes.get();
+}
+}  // namespace
 
 using namespace uitk;
 using namespace uitk::lvgl_cpp;
@@ -29,9 +40,9 @@ void ImageAvatar::init(lv_obj_t* parent)
     _panel->setPadding(0, 0, 0, 0);
     _panel->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
 
-    if (!_config.base_image_name.empty()) {
-        _base_dsc = assets::get_image(_config.base_image_name);
-        _base     = std::make_unique<Image>(_panel->get());
+    if (_config.base.valid()) {
+        build_dsc_from_png(_base_dsc, _config.base);
+        _base = std::make_unique<Image>(_panel->get());
         _base->setAlign(LV_ALIGN_TOP_LEFT);
         _base->setPos(_config.base_x, _config.base_y);
         _base->setSize(_config.base_w, _config.base_h);

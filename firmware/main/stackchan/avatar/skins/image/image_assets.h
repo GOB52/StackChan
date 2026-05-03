@@ -2,14 +2,24 @@
 #pragma once
 #include "../../avatar/elements/emotion.h"
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
 namespace stackchan::avatar::image {
 
+// PNG bytes resident in PSRAM. Owned by the ImageAvatarConfig (then by the
+// resulting ImageAvatar). lv_image_dsc_t built at ImageAvatar init time
+// references `bytes.get()` directly; the buffer must outlive the ImageAvatar.
+struct PngBuffer {
+    std::unique_ptr<uint8_t[]> bytes;
+    size_t size = 0;
+    bool valid() const { return bytes && size > 0; }
+};
+
 struct EyeAsset {
-    std::string open_image_name;
-    std::string closed_image_name;
+    PngBuffer open;
+    PngBuffer closed;
     int x      = 0;
     int y      = 0;
     int width  = 0;
@@ -17,8 +27,8 @@ struct EyeAsset {
 };
 
 struct MouthAsset {
-    std::string normal_image_name;
-    std::string open_image_name;
+    PngBuffer normal;
+    PngBuffer open;
     int normal_x = 0, normal_y = 0;
     int open_x   = 0, open_y   = 0;
     int normal_w = 0, normal_h = 0;
@@ -49,7 +59,7 @@ struct EmotionDecoratorMapping {
 };
 
 struct ImageAvatarConfig {
-    std::string base_image_name;
+    PngBuffer base;
     int base_x = 0, base_y = 0;
     int base_w = 320, base_h = 240;
 

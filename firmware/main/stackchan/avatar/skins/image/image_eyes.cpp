@@ -1,7 +1,5 @@
 // StackChan firmware fork - new file by GOB (X:@GOB_52_GOB / GitHub:GOB52)
 #include "image_avatar.h"
-#include <assets/assets.h>
-#include <utility>
 
 using namespace uitk;
 using namespace uitk::lvgl_cpp;
@@ -9,20 +7,30 @@ using namespace stackchan::avatar::image;
 
 static const int OPEN_THRESHOLD = 50;  // weight >= threshold -> open, < -> closed
 
-ImageEyes::ImageEyes(lv_obj_t* parent, EyeAsset asset) : _asset(std::move(asset))
+namespace {
+// Build an LVGL image descriptor from PSRAM-resident PNG bytes.
+// Caller (this class) owns dsc; data pointer borrows from PngBuffer (asset).
+void build_dsc_from_png(lv_image_dsc_t& dsc, const PngBuffer& src)
 {
-    if (!_asset.open_image_name.empty()) {
-        _dsc_open = assets::get_image(_asset.open_image_name);
-    }
-    if (!_asset.closed_image_name.empty()) {
-        _dsc_closed = assets::get_image(_asset.closed_image_name);
-    }
+    if (!src.valid()) return;
+    dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
+    dsc.header.cf    = LV_COLOR_FORMAT_RAW_ALPHA;
+    dsc.data_size    = src.size;
+    dsc.data         = src.bytes.get();
+}
+}  // namespace
+
+ImageEyes::ImageEyes(lv_obj_t* parent, const EyeAsset& asset)
+    : _x(asset.x), _y(asset.y), _width(asset.width), _height(asset.height)
+{
+    build_dsc_from_png(_dsc_open, asset.open);
+    build_dsc_from_png(_dsc_closed, asset.closed);
 
     _img = std::make_unique<Image>(parent);
     _img->setAlign(LV_ALIGN_TOP_LEFT);
-    _img->setPos(_asset.x, _asset.y);
-    if (_asset.width > 0 && _asset.height > 0) {
-        _img->setSize(_asset.width, _asset.height);
+    _img->setPos(_x, _y);
+    if (_width > 0 && _height > 0) {
+        _img->setSize(_width, _height);
     }
     _img->setSrc(&_dsc_open);
     _is_open = true;
@@ -57,5 +65,5 @@ void ImageEyes::setPosition(const Vector2i& position)
     // Microscopic gaze offset (-100..100 -> -4..4 px) so eyebrow/forehead don't shift
     int dx = (_position.x * 4) / 100;
     int dy = (_position.y * 4) / 100;
-    _img->setPos(_asset.x + dx, _asset.y + dy);
+    _img->setPos(_x + dx, _y + dy);
 }
