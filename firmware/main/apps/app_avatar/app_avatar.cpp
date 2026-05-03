@@ -17,6 +17,14 @@
 // 0 = DefaultAvatar (upstream), 1 = ponko ImageAvatar (StackChan fork by GOB)
 #define USE_PONKO_AVATAR 1
 
+// 0 = use C++ ponko_preset directly, 1 = load from avatar.json + ponko.json
+// (Phase 1.5a: JSON manifest with C++ preset fallback on any error)
+#define USE_AVATAR_JSON_CONFIG 1
+
+// Phase 1.5b on-device test: force NVS current_skin to a specific id at app open.
+// Empty string = no override. Useful to switch between "ponko"/"robot" without UI.
+#define FORCE_NVS_SKIN_ID "ponko"
+
 // 1 = cycle Neutral/Happy/Angry/Sad every 5s for emotion + decorator pipeline check
 #define ENABLE_EMOTION_TEST 1
 
@@ -25,6 +33,10 @@
 
 #if USE_PONKO_AVATAR
 #include <stackchan/avatar/skins/image/presets/ponko_preset.h>
+#if USE_AVATAR_JSON_CONFIG
+#include <stackchan/avatar/skins/image/skin_loader.h>
+// toast.h is already included via apps/common/common.h
+#endif
 #endif
 #include <string_view>
 #include <cstdint>
@@ -98,13 +110,37 @@ void AppAvatar::onOpen()
     loading_page.reset();
 
     // Create avatar (Default or ponko, switched via USE_PONKO_AVATAR)
+    std::string skin_load_error;  // populated only on JSON-config error so we can toast after attach
 #if USE_PONKO_AVATAR
-    auto avatar = avatar::image::make_ponko_avatar();
+#if USE_AVATAR_JSON_CONFIG
+    {
+        // Optional Phase 1.5b on-device test: write FORCE_NVS_SKIN_ID to NVS so the
+        // loader picks it up on this run.
+        if (sizeof(FORCE_NVS_SKIN_ID) > 1) {  // not empty
+            avatar::image::set_current_skin_id_nvs(FORCE_NVS_SKIN_ID);
+            mclog::tagInfo(getAppInfo().name, "FORCE_NVS_SKIN_ID applied: {}", FORCE_NVS_SKIN_ID);
+        }
+        // JSON loader returns already-init()-ed avatar; on failure falls back to DefaultAvatar.
+        auto skin = avatar::image::load_avatar_or_fallback(lv_screen_active());
+        if (!skin.error_message.empty()) {
+            skin_load_error = skin.error_message;
+        }
+        GetStackChan().attachAvatar(std::move(skin.avatar));
+    }
 #else
-    auto avatar = std::make_unique<avatar::DefaultAvatar>();
+    {
+        auto avatar = avatar::image::make_ponko_avatar();
+        avatar->init(lv_screen_active());
+        GetStackChan().attachAvatar(std::move(avatar));
+    }
 #endif
-    avatar->init(lv_screen_active());
-    GetStackChan().attachAvatar(std::move(avatar));
+#else
+    {
+        auto avatar = std::make_unique<avatar::DefaultAvatar>();
+        avatar->init(lv_screen_active());
+        GetStackChan().attachAvatar(std::move(avatar));
+    }
+#endif
 
     // Register autonomous animation modifiers (StackChan fork by GOB)
     GetStackChan().addModifier(std::make_unique<BlinkModifier>());
@@ -246,6 +282,13 @@ void AppAvatar::onOpen()
     /* ----------------------------- Common widgets ----------------------------- */
     view::create_home_indicator([&]() { close(); }, 0xFF9ABC, 0x431525);
     view::create_status_bar(0xFF9ABC, 0x431525);
+
+#if USE_PONKO_AVATAR && USE_AVATAR_JSON_CONFIG
+    // Show top toast on skin-load failure (12s, same convention as WS errors).
+    if (!skin_load_error.empty()) {
+        view::pop_a_toast(skin_load_error, view::ToastType::Error, 12000);
+    }
+#endif
 }
 
 void AppAvatar::onRunning()
