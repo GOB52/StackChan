@@ -3,6 +3,7 @@
  *
  * SPDX-License-Identifier: MIT
  */
+// Modified by GOB (X:@GOB_52_GOB / GitHub:GOB52) - StackChan firmware fork
 #pragma once
 #include <memory>
 #include <cstdint>
@@ -15,6 +16,7 @@
 #include <array>
 #include <lvgl_image.h>
 #include <string_view>
+#include <atomic>
 
 /**
  * @brief
@@ -236,6 +238,10 @@ public:
     void syncSystemTimeToRtc();
     void setTimezone(std::string_view tz);
     std::string getTimezone();
+    // Called from SNTP cb (tcpip_thread); sets pending flag, actual I2C/RTC write
+    // is deferred to main task via tickSntpRtcSyncIfPending() to avoid stack overflow.
+    void requestRtcSyncFromSntp();
+    void tickSntpRtcSyncIfPending();
 
     /* --------------------------------- EspNow --------------------------------- */
     uitk::Signal<const std::vector<uint8_t>&> onEspNowData;
@@ -275,6 +281,7 @@ public:
 
 private:
     bool _xiaozhi_start_requested = false;
+    std::atomic<bool> _rtc_sync_pending{false};
 
     void xiaozhi_board_init();
     void lvgl_init();

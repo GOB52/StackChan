@@ -3,6 +3,7 @@
  *
  * SPDX-License-Identifier: MIT
  */
+// Modified by GOB (X:@GOB_52_GOB / GitHub:GOB52) - StackChan firmware fork
 #include "decorators.h"
 #include <hal/hal.h>
 #include <vector>
@@ -18,13 +19,15 @@ static const std::vector<int> _sweat_pos_y_frames = {-72, -68, -62, -58, 0};
 LV_IMAGE_DECLARE(decorator_sweat);
 
 SweatDecorator::SweatDecorator(lv_obj_t* parent, uint32_t destroyAfterMs, uint32_t animationIntervalMs)
-    : _animation_interval_ms(animationIntervalMs)
+    : _animation_interval_ms(animationIntervalMs),
+      _base_x(_sweat_default_position.x),
+      _base_y(_sweat_default_position.y)
 {
     // 初始化图像
     _sweat = std::make_unique<Image>(parent);
     _sweat->setSrc(&decorator_sweat);
     _sweat->setAlign(LV_ALIGN_CENTER);
-    _sweat->setPos(_sweat_default_position.x, _sweat_default_position.y);
+    _sweat->setPos(_base_x, _base_y);
 
     _sweat->setTransformPivot(_sweat->getWidth() / 2, _sweat->getHeight() / 2);
     _sweat->setImageRecolorOpa(LV_OPA_COVER);
@@ -66,9 +69,10 @@ void SweatDecorator::_update()
             // 特殊帧：隐藏图像
             setVisible(false);
         } else {
-            // 普通帧：移动位置并显示
+            // 普通帧：基準位置 (_base_x, _base_y) からのオフセットで移動
             setVisible(true);
-            _sweat->setPos(_sweat_default_position.x, current_y_frame);
+            int offset_y = current_y_frame - _sweat_default_position.y;
+            _sweat->setPos(_base_x, _base_y + offset_y);
         }
 
         // 步进索引
@@ -78,9 +82,11 @@ void SweatDecorator::_update()
 
 void SweatDecorator::setPosition(int x, int y)
 {
-    // 注意：这里的 setPosition 会覆盖动画中的 x 坐标
+    // 基準位置を更新。落下アニメは (_base_x, _base_y) からの相対オフセットで動く。
+    _base_x = x;
+    _base_y = y;
     if (_sweat) {
-        _sweat->setPos(x, y);
+        _sweat->setPos(_base_x, _base_y);
     }
 }
 

@@ -3,6 +3,7 @@
  *
  * SPDX-License-Identifier: MIT
  */
+// Modified by GOB (X:@GOB_52_GOB / GitHub:GOB52) - StackChan firmware fork
 #include "hal.h"
 #include <stackchan/stackchan.h>
 #include "board/hal_bridge.h"
@@ -121,6 +122,7 @@ public:
             ESP_LOGI(_tag.c_str(), "Connected to server!");
             // GetHAL().onWsLog.emit(CommonLogLevel::Info, "Server connected");
             _last_heartbeat_time = GetHAL().millis();
+            _connect_failure_reported = false;  // reset so next failure series logs once again
             _websocket->Send("{\"type\":\"hello\", \"msg\":\"Hello from StackChan!\"}");
         });
 
@@ -137,8 +139,13 @@ public:
         // ESP_LOGI(_tag.c_str(), "Connecting to %s...", _url.c_str());
         // GetHAL().onWsLog.emit(CommonLogLevel::Info, "Connecting to server...");
         if (!_websocket->Connect(_url.c_str())) {
-            ESP_LOGE(_tag.c_str(), "Failed to connect");
-            GetHAL().onWsLog.emit(CommonLogLevel::Error, "Connect to server Failed");
+            // Suppress repeated logs when reconnect fails every 5s (e.g. server unreachable).
+            // Re-armed on successful connect so a new outage triggers one notification again.
+            if (!_connect_failure_reported) {
+                _connect_failure_reported = true;
+                ESP_LOGE(_tag.c_str(), "Failed to connect");
+                GetHAL().onWsLog.emit(CommonLogLevel::Error, "Connect to server Failed");
+            }
         }
         _last_reconnect_attempt = GetHAL().millis();
     }
@@ -432,6 +439,7 @@ private:
     uint32_t _last_heartbeat_time    = 0;
     bool _is_streaming               = false;
     bool _is_video_mode              = false;
+    bool _connect_failure_reported   = false;
     std::mutex _mutex;
     std::queue<ReceivedMessage> _msg_queue;
 

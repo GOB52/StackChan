@@ -3,6 +3,7 @@
  *
  * SPDX-License-Identifier: MIT
  */
+// Modified by GOB (X:@GOB_52_GOB / GitHub:GOB52) - StackChan firmware fork
 #include "hal.h"
 #include <stackchan/stackchan.h>
 #include <mooncake.h>
@@ -23,7 +24,10 @@ static bool _is_network_connected = false;
 static void time_sync_notification_cb(struct timeval* tv)
 {
     mclog::tagInfo(_tag, "SNTP time synchronized");
-    GetHAL().syncSystemTimeToRtc();
+    // Defer I2C/RTC write to main task. Calling syncSystemTimeToRtc() directly here
+    // (from tcpip_thread context) caused stack overflow corrupting adjacent heap
+    // (manifesting as Mooncake AbilityManager vptr corruption -> Guru Meditation).
+    GetHAL().requestRtcSyncFromSntp();
 }
 
 void Hal::startSntp()

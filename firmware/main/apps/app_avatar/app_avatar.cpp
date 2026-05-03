@@ -3,6 +3,7 @@
  *
  * SPDX-License-Identifier: MIT
  */
+// Modified by GOB (X:@GOB_52_GOB / GitHub:GOB52) - StackChan firmware fork
 #include "app_avatar.h"
 #include "view/ws_call.h"
 #include <hal/hal.h>
@@ -12,6 +13,19 @@
 #include <smooth_lvgl.hpp>
 #include <stackchan/stackchan.h>
 #include <apps/common/common.h>
+
+// 0 = DefaultAvatar (upstream), 1 = ponko ImageAvatar (StackChan fork by GOB)
+#define USE_PONKO_AVATAR 1
+
+// 1 = cycle Neutral/Happy/Angry/Sad every 5s for emotion + decorator pipeline check
+#define ENABLE_EMOTION_TEST 1
+
+// 1 = always-on SpeakingModifier (mouth flapping) for mouth animation check
+#define ENABLE_SPEAKING_TEST 1
+
+#if USE_PONKO_AVATAR
+#include <stackchan/avatar/skins/image/presets/ponko_preset.h>
+#endif
 #include <string_view>
 #include <cstdint>
 #include <memory>
@@ -83,10 +97,21 @@ void AppAvatar::onOpen()
     // Destroy loading page
     loading_page.reset();
 
-    // Create default avatar
+    // Create avatar (Default or ponko, switched via USE_PONKO_AVATAR)
+#if USE_PONKO_AVATAR
+    auto avatar = avatar::image::make_ponko_avatar();
+#else
     auto avatar = std::make_unique<avatar::DefaultAvatar>();
+#endif
     avatar->init(lv_screen_active());
     GetStackChan().attachAvatar(std::move(avatar));
+
+    // Register autonomous animation modifiers (StackChan fork by GOB)
+    GetStackChan().addModifier(std::make_unique<BlinkModifier>());
+#if ENABLE_SPEAKING_TEST
+    // Continuous mouth flapping (motion disabled: motion may be unattached in this app)
+    GetStackChan().addModifier(std::make_unique<SpeakingModifier>(0, 180, false));
+#endif
 
     /* ------------------------------- BLE events ------------------------------- */
     GetHAL().onBleAvatarData.connect([&](const char* data) {
@@ -241,6 +266,26 @@ void AppAvatar::onRunning()
         _ble_motion_data.update_flag = false;
         _ble_motion_data.data_ptr    = nullptr;
     }
+
+#if ENABLE_EMOTION_TEST
+    {
+        static uint32_t last_emo_tick = 0;
+        static int emo_idx            = 0;
+        if (GetHAL().millis() - last_emo_tick > 5000) {
+            last_emo_tick = GetHAL().millis();
+            const avatar::Emotion emos[] = {
+                avatar::Emotion::Neutral,
+                avatar::Emotion::Happy,
+                avatar::Emotion::Angry,
+                avatar::Emotion::Sad,
+            };
+            const char* names[] = {"Neutral", "Happy", "Angry", "Sad"};
+            mclog::tagInfo(getAppInfo().name, "emotion test: {}", names[emo_idx]);
+            GetStackChan().avatar().setEmotion(emos[emo_idx]);
+            emo_idx = (emo_idx + 1) % 4;
+        }
+    }
+#endif
 
     GetStackChan().update();
 

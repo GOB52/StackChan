@@ -3,6 +3,7 @@
  *
  * SPDX-License-Identifier: MIT
  */
+// Modified by GOB (X:@GOB_52_GOB / GitHub:GOB52) - StackChan firmware fork
 #pragma once
 #include "../avatar/decorator.h"
 #include <lvgl.h>
@@ -116,6 +117,8 @@ private:
     bool _has_lifetime              = false;
 
     int _animation_index = 0;
+    int _base_x          = 0;
+    int _base_y          = 0;
 };
 
 /**

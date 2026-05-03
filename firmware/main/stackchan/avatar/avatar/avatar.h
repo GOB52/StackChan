@@ -3,6 +3,7 @@
  *
  * SPDX-License-Identifier: MIT
  */
+// Modified by GOB (X:@GOB_52_GOB / GitHub:GOB52) - StackChan firmware fork
 #pragma once
 #include "elements/key_elements.h"
 #include "decorator.h"
@@ -16,6 +17,8 @@ namespace stackchan::avatar {
  */
 class Avatar {
 public:
+    virtual ~Avatar() = default;
+
     /**
      * @brief Update avatar, trigger all elements, decorators and modifiers to update
      *

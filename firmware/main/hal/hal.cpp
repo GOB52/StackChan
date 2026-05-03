@@ -3,6 +3,7 @@
  *
  * SPDX-License-Identifier: MIT
  */
+// Modified by GOB (X:@GOB_52_GOB / GitHub:GOB52) - StackChan firmware fork
 #include "hal.h"
 #include <memory>
 #include <mooncake_log.h>
@@ -118,6 +119,7 @@ static void _confirm_ota_image_if_stable()
 void Hal::updateHeapStatusLog()
 {
     _confirm_ota_image_if_stable();
+    tickSntpRtcSyncIfPending();
 
     static uint32_t last_log_tick = 0;
     if (millis() - last_log_tick < 10000) {
@@ -125,6 +127,18 @@ void Hal::updateHeapStatusLog()
     }
     last_log_tick = millis();
     SystemInfo::PrintHeapStats();
+}
+
+void Hal::requestRtcSyncFromSntp()
+{
+    _rtc_sync_pending.store(true, std::memory_order_release);
+}
+
+void Hal::tickSntpRtcSyncIfPending()
+{
+    if (_rtc_sync_pending.exchange(false, std::memory_order_acq_rel)) {
+        syncSystemTimeToRtc();
+    }
 }
 
 /* -------------------------------------------------------------------------- */
