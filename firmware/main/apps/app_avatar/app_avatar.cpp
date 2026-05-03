@@ -38,6 +38,13 @@
 // toast.h is already included via apps/common/common.h
 #endif
 #endif
+
+// Phase 1.5c.1: SD probe at app open. Logs only; no skin_loader integration yet.
+#define ENABLE_SD_PROBE_TEST 1
+#if ENABLE_SD_PROBE_TEST
+#include <hal/board/sd_guard.h>
+#include <dirent.h>
+#endif
 #include <string_view>
 #include <cstdint>
 #include <memory>
@@ -89,6 +96,34 @@ void AppAvatar::onCreate()
 void AppAvatar::onOpen()
 {
     mclog::tagInfo(getAppInfo().name, "on open");
+
+#if ENABLE_SD_PROBE_TEST
+    // Phase 1.5c.1: probe SD card insertion + mount, then list /sdcard root.
+    // Verifies GPIO35 swap doesn't break LCD on either path (inserted/absent).
+    {
+        bool inserted = stackchan::hal::SdGuard::isInserted();
+        mclog::tagInfo(getAppInfo().name, "[SD probe] inserted={}", inserted);
+        if (inserted) {
+            stackchan::hal::SdGuard guard;
+            bool mounted = guard.ensureMounted();
+            mclog::tagInfo(getAppInfo().name, "[SD probe] mount={}", mounted);
+            if (mounted) {
+                DIR* d = opendir("/sdcard");
+                if (d) {
+                    int n = 0;
+                    while (auto* ent = readdir(d)) {
+                        mclog::tagInfo(getAppInfo().name, "[SD probe] /sdcard/{}", ent->d_name);
+                        if (++n >= 16) break;
+                    }
+                    closedir(d);
+                } else {
+                    mclog::tagError(getAppInfo().name, "[SD probe] opendir /sdcard failed");
+                }
+            }
+        }
+        mclog::tagInfo(getAppInfo().name, "[SD probe] back to LCD mode");
+    }
+#endif
 
     // Create loading page
     std::unique_ptr<view::LoadingPage> loading_page;

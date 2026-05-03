@@ -43,6 +43,7 @@ void start_xiaozhi_app();
 bool is_xiaozhi_ready();
 
 i2c_master_bus_handle_t board_get_i2c_bus();
+bool board_is_sd_inserted();
 StackChanCamera* board_get_camera();
 int board_get_battery_level();
 bool board_is_battery_charging();
