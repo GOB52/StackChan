@@ -43,10 +43,12 @@ std::unique_ptr<ImageAvatar> make_ponko_avatar()
     constexpr int CHEEK_Y = 20;
     cfg.emotion_decorators = {
         // {emotion, kind, anim_ms, has_custom_position, x, y}
-        {Emotion::Happy, EmotionDecoratorKind::Heart, 500, true, 108, CHEEK_Y},   // 右頬
-        {Emotion::Angry, EmotionDecoratorKind::Angry, 500, true, 108, CHEEK_Y},   // 右頬
-        {Emotion::Sad,   EmotionDecoratorKind::Sweat, 700, true, -116, CHEEK_Y},  // 左頬
-        // Doubt / Sleepy: Phase 2 で対応 Decorator 追加後に有効化
+        {Emotion::Happy,  EmotionDecoratorKind::Heart,  500, true, 108,  CHEEK_Y},  // 右頬
+        {Emotion::Angry,  EmotionDecoratorKind::Angry,  500, true, 108,  CHEEK_Y},  // 右頬
+        {Emotion::Sad,    EmotionDecoratorKind::Sweat,  700, true, -116, CHEEK_Y},  // 左頬
+        // Phase 2-1: 目は ImageAvatar 側で強制閉じ。Doubt は Heart と同じ頬位置。
+        {Emotion::Sleepy, EmotionDecoratorKind::Sleepy, 200, true, 108,  -70},      // 頭右上
+        {Emotion::Doubt,  EmotionDecoratorKind::Doubt,  500, true, 108,  CHEEK_Y},  // 右頬 (Heart と同位置)
     };
 
     return std::make_unique<ImageAvatar>(std::move(cfg));

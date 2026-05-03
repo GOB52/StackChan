@@ -1,6 +1,7 @@
 // StackChan firmware fork - new file by GOB (X:@GOB_52_GOB / GitHub:GOB52)
 #include "image_avatar.h"
 #include "../../decorators/decorators.h"
+#include "../default/default.h"
 #include <assets/assets.h>
 #include <mooncake_log.h>
 #include <algorithm>
@@ -40,6 +41,16 @@ void ImageAvatar::init(lv_obj_t* parent)
     _key_elements.leftEye  = std::make_unique<ImageEyes>(_panel->get(), _config.eye_left);
     _key_elements.rightEye = std::make_unique<ImageEyes>(_panel->get(), _config.eye_right);
     _key_elements.mouth    = std::make_unique<ImageMouth>(_panel->get(), _config.mouth);
+
+    // Speech bubble: reuse DefaultSpeechBubble so xiaozhi/WS messages and emotion-test
+    // labels render in the bottom bubble. Font must NOT be nullptr (LVGL hangs on size calc).
+    // Use Montserrat 16 to match DefaultAvatar's default.
+    _key_elements.speechBubble = std::make_unique<DefaultSpeechBubble>(
+        parent,
+        lv_color_hex(0xFFFFFF),       // primary (吹き出し本体): 白
+        lv_color_hex(0x000000),       // secondary (テキスト): 黒
+        &lv_font_montserrat_16        // font: Montserrat 16 (DefaultAvatar default)
+    );
 }
 
 Container* ImageAvatar::getPanel() const
@@ -54,6 +65,19 @@ void ImageAvatar::setEmotion(const Emotion& emotion)
     if (_emotion_decorator_id >= 0) {
         removeDecorator(_emotion_decorator_id);
         _emotion_decorator_id = -1;
+    }
+
+    // Sleepy / Doubt は目を強制的に閉じる。BlinkModifier の上書きを防ぐため
+    // setModifyLock(true) でロックする。他 emotion 復帰時にロック解除＆目を開く。
+    const bool eyes_closed = (emotion == Emotion::Sleepy || emotion == Emotion::Doubt);
+    if (eyes_closed) {
+        setModifyLock(true);
+        _key_elements.leftEye->setWeight(0);
+        _key_elements.rightEye->setWeight(0);
+    } else {
+        setModifyLock(false);
+        _key_elements.leftEye->setWeight(100);
+        _key_elements.rightEye->setWeight(100);
     }
 
     auto it = std::find_if(_config.emotion_decorators.begin(), _config.emotion_decorators.end(),
@@ -93,6 +117,18 @@ void ImageAvatar::setEmotion(const Emotion& emotion)
             auto d = std::make_unique<DizzyDecorator>(deco_parent, 0, it->animation_interval_ms);
             if (it->has_custom_position) d->setPosition(it->x, it->y);
             deco = std::move(d);
+            break;
+        }
+        case EmotionDecoratorKind::Sleepy: {
+            auto z = std::make_unique<SleepyDecorator>(deco_parent, 0, it->animation_interval_ms);
+            if (it->has_custom_position) z->setPosition(it->x, it->y);
+            deco = std::move(z);
+            break;
+        }
+        case EmotionDecoratorKind::Doubt: {
+            auto q = std::make_unique<DoubtDecorator>(deco_parent, 0, it->animation_interval_ms);
+            if (it->has_custom_position) q->setPosition(it->x, it->y);
+            deco = std::move(q);
             break;
         }
         default:

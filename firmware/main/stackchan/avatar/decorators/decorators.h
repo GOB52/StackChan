@@ -10,6 +10,7 @@
 #include <smooth_lvgl.hpp>
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 namespace stackchan::avatar {
 
@@ -181,6 +182,64 @@ public:
 private:
     std::unique_ptr<uitk::lvgl_cpp::Image> _left;
     std::unique_ptr<uitk::lvgl_cpp::Image> _right;
+
+    uint32_t _destroy_at            = 0;
+    uint32_t _next_animation_tick   = 0;
+    uint32_t _animation_interval_ms = 0;
+    bool _has_lifetime              = false;
+
+    int _animation_index = 0;
+};
+
+// ---------------------------------------------------------------------------
+// Below are added by GOB (StackChan firmware fork) for ImageAvatar Phase 2-1.
+// SleepyDecorator: PNG image "ZZZ" floating upward and fading out, then loops.
+// DoubtDecorator:  PNG image "?" wiggling (rotation) like Heart.
+// ---------------------------------------------------------------------------
+
+class SleepyDecorator : public Decorator {
+public:
+    SleepyDecorator(lv_obj_t* parent, uint32_t destroyAfterMs = 0, uint32_t animationIntervalMs = 200);
+    ~SleepyDecorator();
+
+    void _update() override;
+
+    using Element::setPosition;
+
+    void setPosition(int x, int y);
+    void setColor(lv_color_t color);
+    void setVisible(bool visible) override;
+
+private:
+    std::unique_ptr<uitk::lvgl_cpp::Image> _zzz;
+
+    uint32_t _destroy_at            = 0;
+    uint32_t _next_animation_tick   = 0;
+    uint32_t _animation_interval_ms = 0;
+    bool _has_lifetime              = false;
+
+    int _base_x   = 0;
+    int _base_y   = 0;
+    int _y_offset = 0;  // base_y からの上方向オフセット (負方向に浮上)
+    int _opa      = 0;  // 0..255
+};
+
+class DoubtDecorator : public Decorator {
+public:
+    DoubtDecorator(lv_obj_t* parent, uint32_t destroyAfterMs = 0, uint32_t animationIntervalMs = 500);
+    ~DoubtDecorator();
+
+    void _update() override;
+
+    using Element::setPosition;
+
+    void setPosition(int x, int y);
+    void setRotation(int rotation) override;
+    void setColor(lv_color_t color);
+    void setVisible(bool visible) override;
+
+private:
+    std::unique_ptr<uitk::lvgl_cpp::Image> _question;
 
     uint32_t _destroy_at            = 0;
     uint32_t _next_animation_tick   = 0;

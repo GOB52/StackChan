@@ -278,11 +278,15 @@ void AppAvatar::onRunning()
                 avatar::Emotion::Happy,
                 avatar::Emotion::Angry,
                 avatar::Emotion::Sad,
+                avatar::Emotion::Doubt,
+                avatar::Emotion::Sleepy,
             };
-            const char* names[] = {"Neutral", "Happy", "Angry", "Sad"};
+            const char* names[] = {"Neutral", "Happy", "Angry", "Sad", "Doubt", "Sleepy"};
+            constexpr int EMO_COUNT = sizeof(emos) / sizeof(emos[0]);
             mclog::tagInfo(getAppInfo().name, "emotion test: {}", names[emo_idx]);
             GetStackChan().avatar().setEmotion(emos[emo_idx]);
-            emo_idx = (emo_idx + 1) % 4;
+            GetStackChan().avatar().setSpeech(names[emo_idx]);  // 吹き出しに emotion 名表示
+            emo_idx = (emo_idx + 1) % EMO_COUNT;
         }
     }
 #endif

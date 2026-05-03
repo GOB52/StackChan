@@ -32,6 +32,8 @@ enum class EmotionDecoratorKind {
     Sweat,
     Shy,
     Dizzy,
+    Sleepy,
+    Doubt,
 };
 
 struct EmotionDecoratorMapping {
