@@ -1,5 +1,6 @@
 // StackChan firmware fork - new file by GOB (X:@GOB_52_GOB / GitHub:GOB52)
 #pragma once
+#include "../../avatar/avatar.h"            // HeadPetDecoratorConfig
 #include "../../avatar/elements/emotion.h"
 #include <cstdint>
 #include <memory>
@@ -68,6 +69,15 @@ struct ImageAvatarConfig {
     MouthAsset mouth;
 
     std::vector<EmotionDecoratorMapping> emotion_decorators;
+
+    // GOB fork: per-skin head-pet decorator positions (Heart / Shy) used by
+    // HeadPetModifier. Defaults (has_* = false) let HeadPetModifier fall back
+    // to the decorator's built-in default position (DefaultAvatar layout).
+    HeadPetDecoratorConfig head_pet;
+
+    // GOB fork: per-skin Dizzy decorator color / anim / scale. Position is
+    // auto-derived from eye_left / eye_right rect via getEyeCenterOffset().
+    DizzyConfig dizzy;
 };
 
 }  // namespace stackchan::avatar::image

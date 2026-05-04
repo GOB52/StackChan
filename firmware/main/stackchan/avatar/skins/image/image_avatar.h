@@ -17,9 +17,21 @@ public:
     ~ImageAvatar() override = default;
 
     void init(lv_obj_t* parent);
-    uitk::lvgl_cpp::Container* getPanel() const;
+    uitk::lvgl_cpp::Container* getPanel() const override;
 
-    void setEmotion(const Emotion& emotion) override;
+    void setEmotion(const Emotion& emotion, bool suppressDecorator = false) override;
+
+    const HeadPetDecoratorConfig* getHeadPetConfig() const override { return &_config.head_pet; }
+
+    const DizzyConfig* getDizzyConfig() const override { return &_config.dizzy; }
+
+    // Per-skin eye centers derived from manifest's eye_left / eye_right rect.
+    // Returned values are LV_ALIGN_CENTER offsets (screen center 160, 120 → 0).
+    uitk::Vector2i getEyeCenterOffset(bool isLeft) const override
+    {
+        const auto& e = isLeft ? _config.eye_left : _config.eye_right;
+        return uitk::Vector2i(e.x + e.width / 2 - 160, e.y + e.height / 2 - 120);
+    }
 
 private:
     ImageAvatarConfig _config;  // owns PngBuffer bytes (PSRAM)

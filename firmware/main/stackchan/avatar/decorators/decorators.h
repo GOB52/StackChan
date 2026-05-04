@@ -142,6 +142,9 @@ public:
     using Element::setPosition;
 
     void setPosition(int x, int y);
+    // GOB fork: independent left / right cheek positions (LV_ALIGN_CENTER offset).
+    // Use this when the avatar's cheeks are not L/R-symmetric around screen center.
+    void setLeftRightPosition(int lx, int ly, int rx, int ry);
     void setRotation(int rotation) override;
     void setColor(lv_color_t color);
     void setVisible(bool visible) override;
@@ -175,8 +178,13 @@ public:
     using Element::setPosition;
 
     void setPosition(int x, int y);
+    // GOB fork: independent left / right eye-center positions (LV_ALIGN_CENTER
+    // offset). Used by IMUModifier to follow per-skin eye layout.
+    void setLeftRightPosition(int lx, int ly, int rx, int ry);
     void setRotation(int rotation) override;
     void setColor(lv_color_t color);
+    // GOB fork: scale multiplier (1.0f = 100%, internally LVGL 256-based).
+    void setScale(float scale);
     void setVisible(bool visible) override;
 
 private:

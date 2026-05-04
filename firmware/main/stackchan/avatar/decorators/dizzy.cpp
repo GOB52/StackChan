@@ -116,6 +116,28 @@ void DizzyDecorator::setColor(lv_color_t color)
     }
 }
 
+// GOB fork: independent left / right placement (LV_ALIGN_CENTER offset).
+void DizzyDecorator::setLeftRightPosition(int lx, int ly, int rx, int ry)
+{
+    if (_left)  _left->setPos(lx, ly);
+    if (_right) _right->setPos(rx, ry);
+}
+
+// GOB fork: scale multiplier (1.0f = 100%). Converts to LVGL native (256 = 1x).
+void DizzyDecorator::setScale(float scale)
+{
+    uint32_t zoom = static_cast<uint32_t>(scale * 256.0f);
+    if (zoom == 0) zoom = 256;
+    if (_left) {
+        _left->setScale(zoom);
+        _left->setTransformPivot(_left->getWidth() / 2, _left->getHeight() / 2);
+    }
+    if (_right) {
+        _right->setScale(zoom);
+        _right->setTransformPivot(_right->getWidth() / 2, _right->getHeight() / 2);
+    }
+}
+
 void DizzyDecorator::setVisible(bool visible)
 {
     if (_left) {

@@ -3,11 +3,10 @@
 #include "../default/default.h"  // DefaultAvatar fallback
 #include "../../avatar/elements/emotion.h"
 #include <hal/board/sd_guard.h>
+#include <stackchan/gob_fork_nvs.h>
 #include <ArduinoJson.hpp>
 #include <mooncake_log.h>
 #include <fmt/format.h>
-#include <nvs.h>
-#include <nvs_flash.h>
 #include <esp_heap_caps.h>
 #include <esp_timer.h>
 #include <cstdio>
@@ -261,45 +260,88 @@ bool load_image_avatar_config(const std::string& skin_dir, ImageAvatarConfig& ou
         }
     }
 
+    // head_pet (GOB fork): per-skin Heart / Shy positions for HeadPetModifier.
+    // Optional. When absent, HeadPetModifier falls back to decorator built-in
+    // defaults (DefaultAvatar layout).
+    auto hp = doc["head_pet"];
+    if (!hp.isNull()) {
+        auto h = hp["heart"];
+        if (!h.isNull()) {
+            out.head_pet.has_heart     = true;
+            out.head_pet.heart_x       = h["x"] | 0;
+            out.head_pet.heart_y       = h["y"] | 0;
+            out.head_pet.heart_anim_ms = h["anim_ms"] | 500u;
+        }
+        auto s = hp["shy"];
+        if (!s.isNull()) {
+            auto sl = s["left"];
+            auto sr = s["right"];
+            // Both left and right required to enable shy override (otherwise
+            // we'd produce an asymmetric defaults+override hybrid).
+            if (!sl.isNull() && !sr.isNull()) {
+                out.head_pet.has_shy     = true;
+                out.head_pet.shy_left_x  = sl["x"] | 0;
+                out.head_pet.shy_left_y  = sl["y"] | 0;
+                out.head_pet.shy_right_x = sr["x"] | 0;
+                out.head_pet.shy_right_y = sr["y"] | 0;
+            }
+        }
+    }
+
+    // dizzy (GOB fork): per-skin Dizzy color / animation / scale used by
+    // IMUModifier. All fields optional; position is auto-derived from
+    // eye_left/eye_right rect via Avatar::getEyeCenterOffset(). Color accepts
+    // "#RRGGBB" or "0xRRGGBB"; missing → keep DizzyDecorator default.
+    auto dz = doc["dizzy"];
+    if (!dz.isNull()) {
+        auto color_node = dz["color"];
+        if (!color_node.isNull()) {
+            const char* cstr = color_node | static_cast<const char*>(nullptr);
+            if (cstr) {
+                std::string s(cstr);
+                if (!s.empty() && s[0] == '#') s.erase(0, 1);
+                if (s.size() >= 2 && (s[0] == '0') && (s[1] == 'x' || s[1] == 'X')) s.erase(0, 2);
+                if (!s.empty()) {
+                    try {
+                        out.dizzy.color_hex = static_cast<uint32_t>(std::stoul(s, nullptr, 16));
+                        out.dizzy.has_color = true;
+                    } catch (...) {
+                        // ignore malformed color, keep default
+                    }
+                }
+            }
+        }
+        out.dizzy.anim_ms = dz["anim_ms"] | 300u;
+        auto scale_node = dz["scale"];
+        if (!scale_node.isNull()) {
+            float sc = scale_node | 1.0f;
+            if (sc > 0.0f) {
+                out.dizzy.scale     = sc;
+                out.dizzy.has_scale = true;
+            }
+        }
+        // Optional per-eye position override (LV_ALIGN_CENTER offset). Both
+        // left and right required to enable; otherwise auto-derive from eye
+        // centers via Avatar::getEyeCenterOffset.
+        auto pos = dz["position"];
+        if (!pos.isNull()) {
+            auto pl = pos["left"];
+            auto pr = pos["right"];
+            if (!pl.isNull() && !pr.isNull()) {
+                out.dizzy.has_position = true;
+                out.dizzy.left_x       = pl["x"] | 0;
+                out.dizzy.left_y       = pl["y"] | 0;
+                out.dizzy.right_x      = pr["x"] | 0;
+                out.dizzy.right_y      = pr["y"] | 0;
+            }
+        }
+    }
+
     if (!out.base.valid()) {
         err = fmt::format("{}: base PNG not loaded", manifest_path);
         return false;
     }
     return true;
-}
-
-// ---- NVS-backed current skin selection ---------------------------------------
-static const char* _nvs_namespace = "skin";
-static const char* _nvs_key       = "current";
-
-std::string get_current_skin_id_nvs()
-{
-    nvs_handle_t h = 0;
-    if (nvs_open(_nvs_namespace, NVS_READONLY, &h) != ESP_OK) {
-        return "";
-    }
-    size_t len = 0;
-    if (nvs_get_str(h, _nvs_key, nullptr, &len) != ESP_OK || len == 0 || len > 64) {
-        nvs_close(h);
-        return "";
-    }
-    std::string out(len, '\0');
-    if (nvs_get_str(h, _nvs_key, out.data(), &len) != ESP_OK) {
-        nvs_close(h);
-        return "";
-    }
-    nvs_close(h);
-    if (!out.empty() && out.back() == '\0') out.pop_back();
-    return out;
-}
-
-bool set_current_skin_id_nvs(const std::string& id)
-{
-    nvs_handle_t h = 0;
-    if (nvs_open(_nvs_namespace, NVS_READWRITE, &h) != ESP_OK) return false;
-    bool ok = (nvs_set_str(h, _nvs_key, id.c_str()) == ESP_OK) && (nvs_commit(h) == ESP_OK);
-    nvs_close(h);
-    return ok;
 }
 
 // ---- Top-level loader ---------------------------------------------------------
@@ -318,6 +360,18 @@ static SkinLoadResult make_default_fallback(lv_obj_t* parent, const std::string&
 SkinLoadResult load_avatar_or_fallback(lv_obj_t* parent)
 {
     int64_t t_start = esp_timer_get_time();
+
+    // Forced DefaultAvatar (set via NVS = "__default__"). Skip SD entirely.
+    {
+        std::string nvs_id = stackchan::gob_fork::get_skin_current();
+        if (nvs_id == stackchan::gob_fork::FORCE_DEFAULT_AVATAR_ID) {
+            mclog::tagInfo(_tag, "NVS forces DefaultAvatar (id='{}')", nvs_id);
+            SkinLoadResult r = make_default_fallback(parent, "");
+            r.error_message  = "";  // not an error path
+            r.loaded_skin_id = stackchan::gob_fork::FORCE_DEFAULT_AVATAR_ID;
+            return r;
+        }
+    }
 
     // 1. Card present?
     if (!hal::SdGuard::isInserted()) {
@@ -344,7 +398,7 @@ SkinLoadResult load_avatar_or_fallback(lv_obj_t* parent)
         }
 
         // 4. NVS override or avatar.json's "current"
-        skin_id = get_current_skin_id_nvs();
+        skin_id = stackchan::gob_fork::get_skin_current();
         if (skin_id.empty()) {
             skin_id = index.current;
         } else {

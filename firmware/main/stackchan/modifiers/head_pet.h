@@ -79,16 +79,30 @@ private:
             _prev_pitch     = angles.y;
         }
 
-        // 视觉反馈
-        avatar.setEmotion(avatar::Emotion::Happy);
+        // 视觉反馈 (GOB fork: suppress emotion decorator to avoid double Heart;
+        // HeadPet adds its own Heart + Shy below).
+        avatar.setEmotion(avatar::Emotion::Happy, /*suppressDecorator=*/true);
 
-        // 添加爱心装饰
+        // 添加爱心装饰 (GOB fork: per-skin position via avatar.getHeadPetConfig()).
         int duration = Random::getInstance().getInt(1500, 2500);
         avatar.removeDecorator(_heart_decorator_id);
         avatar.removeDecorator(_shy_decorator_id);
-        _heart_decorator_id =
-            avatar.addDecorator(std::make_unique<avatar::HeartDecorator>(lv_screen_active(), duration, 500));
-        _shy_decorator_id = avatar.addDecorator(std::make_unique<avatar::ShyDecorator>(lv_screen_active(), duration));
+
+        auto* hp_cfg = avatar.getHeadPetConfig();
+
+        uint32_t heart_anim = (hp_cfg && hp_cfg->has_heart) ? hp_cfg->heart_anim_ms : 500;
+        auto heart = std::make_unique<avatar::HeartDecorator>(lv_screen_active(), duration, heart_anim);
+        if (hp_cfg && hp_cfg->has_heart) {
+            heart->setPosition(hp_cfg->heart_x, hp_cfg->heart_y);
+        }
+        _heart_decorator_id = avatar.addDecorator(std::move(heart));
+
+        auto shy = std::make_unique<avatar::ShyDecorator>(lv_screen_active(), duration);
+        if (hp_cfg && hp_cfg->has_shy) {
+            shy->setLeftRightPosition(hp_cfg->shy_left_x, hp_cfg->shy_left_y,
+                                      hp_cfg->shy_right_x, hp_cfg->shy_right_y);
+        }
+        _shy_decorator_id = avatar.addDecorator(std::move(shy));
 
         // 动作反馈
         perform_pet_motion(stackchan);

@@ -69,9 +69,9 @@ Container* ImageAvatar::getPanel() const
     return _panel ? _panel.get() : nullptr;
 }
 
-void ImageAvatar::setEmotion(const Emotion& emotion)
+void ImageAvatar::setEmotion(const Emotion& emotion, bool suppressDecorator)
 {
-    Avatar::setEmotion(emotion);
+    Avatar::setEmotion(emotion, suppressDecorator);
 
     if (_emotion_decorator_id >= 0) {
         removeDecorator(_emotion_decorator_id);
@@ -89,6 +89,12 @@ void ImageAvatar::setEmotion(const Emotion& emotion)
         setModifyLock(false);
         _key_elements.leftEye->setWeight(100);
         _key_elements.rightEye->setWeight(100);
+    }
+
+    // GOB fork: HeadPetModifier passes suppressDecorator=true so its own
+    // Heart/Shy decorators don't double up with the emotion-driven decorator.
+    if (suppressDecorator) {
+        return;
     }
 
     auto it = std::find_if(_config.emotion_decorators.begin(), _config.emotion_decorators.end(),
