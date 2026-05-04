@@ -118,4 +118,9 @@ void app_play_sound(const std::string_view& sound)
     app.PlaySound(sound);
 }
 
+bool is_xiaozhi_speaking()
+{
+    return Application::GetInstance().GetDeviceState() == kDeviceStateSpeaking;
+}
+
 }  // namespace hal_bridge
