@@ -119,4 +119,15 @@ void SdGuard::setExtraTouchSkip(bool skip)
     _extra_touch_skip.store(skip);
 }
 
+void SdGuard::performEarlyProbe()
+{
+    if (!hal_bridge::board_is_sd_inserted()) {
+        mclog::tagInfo(_tag, "early probe skipped (no SD inserted)");
+        return;
+    }
+    mclog::tagInfo(_tag, "early probe: handshake with SD card");
+    SdGuard guard;
+    (void)guard.ensureMounted();  // result irrelevant; goal is the SPI handshake
+}
+
 }  // namespace stackchan::hal

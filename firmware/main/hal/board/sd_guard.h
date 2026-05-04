@@ -50,6 +50,17 @@ public:
         TouchSkipGuard(const TouchSkipGuard&)            = delete;
         TouchSkipGuard& operator=(const TouchSkipGuard&) = delete;
     };
+
+    // 起動時に SD card と一度ハンドシェイクを行い、SPI state machine を確定状態に
+    // 持っていく。GPIO35 が LCD_DC と SD MISO で物理共有されているため、未初期化
+    // SD card は CS=HIGH でも MISO を random drive することがあり、launcher 起動
+    // 直後の高速 LCD writes で画面崩れを引き起こす。
+    //
+    // 1 度 mount を試みれば SD と SPI 通信 (CMD0 等) が走り、card は spec 通り
+    // CS=HIGH で tristate するようになる。SD 未挿入 / mount 失敗のいずれも
+    // 害なし (skin loader が後で再試行する)。Hal::init() から xiaozhi_board_init
+    // 直後に 1 回だけ呼ぶ。
+    static void performEarlyProbe();
 };
 
 }  // namespace stackchan::hal

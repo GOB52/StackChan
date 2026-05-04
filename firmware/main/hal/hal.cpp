@@ -5,6 +5,7 @@
  */
 // Modified by GOB (X:@GOB_52_GOB / GitHub:GOB52) - StackChan firmware fork
 #include "hal.h"
+#include "board/sd_guard.h"
 #include "../stackchan/nfc/nfc_cmd_dispatcher.h"
 #include <memory>
 #include <mooncake_log.h>
@@ -35,6 +36,12 @@ void Hal::init()
     ESP_ERROR_CHECK(ret);
 
     xiaozhi_board_init();
+    // GOB fork: handshake with SD card immediately after board init so its SPI
+    // state machine is in a defined state (CS=HIGH → tristate). Without this,
+    // some SD cards drive MISO randomly until first SPI exchange, corrupting
+    // LCD writes via the shared GPIO35 (LCD_DC / SD_MISO) — visible as screen
+    // tearing during launcher swipe right after boot.
+    stackchan::hal::SdGuard::performEarlyProbe();
     xiaozhi_mcp_init();
     head_touch_init();
     io_expander_init();
