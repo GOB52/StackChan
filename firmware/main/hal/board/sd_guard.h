@@ -31,6 +31,25 @@ public:
     // AW9523 P0_3 (TF_SW) を読み、カード挿入有無を返す。
     // SdGuard 構築不要 (I2C のみ使用)。
     static bool isInserted();
+
+    // SD アクセス中 (=このガード生存中) かどうか。touchpad polling など
+    // 他タスクが I2C/共有リソースをスキップしたい場合に参照する。
+    // 拡張 skip フラグ (setExtraTouchSkip) との OR で判定する。
+    // ※ esp_timer_task など別タスクから安全に読める (atomic)。
+    static bool isActive();
+
+    // SD アクセス本体に加えて、関連処理 (thumb 生成等) も touch poll を抑止
+    // したい場合に呼ぶ拡張フラグ。SdGuard 本体のスコープ外でも有効。
+    static void setExtraTouchSkip(bool skip);
+
+    // 拡張 skip スコープ用 RAII ヘルパ。
+    class TouchSkipGuard {
+    public:
+        TouchSkipGuard()  { SdGuard::setExtraTouchSkip(true);  }
+        ~TouchSkipGuard() { SdGuard::setExtraTouchSkip(false); }
+        TouchSkipGuard(const TouchSkipGuard&)            = delete;
+        TouchSkipGuard& operator=(const TouchSkipGuard&) = delete;
+    };
 };
 
 }  // namespace stackchan::hal

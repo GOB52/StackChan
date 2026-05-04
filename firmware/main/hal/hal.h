@@ -130,13 +130,20 @@ public:
         _label_logo = std::make_unique<uitk::lvgl_cpp::Label>(_panel->get());
         _label_logo->setTextFont(&lv_font_montserrat_24);
         _label_logo->setTextColor(lv_color_hex(0xFFFFFF));
-        _label_logo->align(LV_ALIGN_CENTER, 0, -14);
+        _label_logo->align(LV_ALIGN_CENTER, 0, -28);
         _label_logo->setText("STACKCHAN");
+
+        // StackChan firmware fork - added by GOB (X:@GOB_52_GOB / GitHub:GOB52)
+        _label_subtitle = std::make_unique<uitk::lvgl_cpp::Label>(_panel->get());
+        _label_subtitle->setTextFont(&lv_font_montserrat_16);
+        _label_subtitle->setTextColor(lv_color_hex(0x4CAF50));
+        _label_subtitle->align(LV_ALIGN_CENTER, 0, -2);
+        _label_subtitle->setText("GOB fork");
 
         _label_msg = std::make_unique<uitk::lvgl_cpp::Label>(_panel->get());
         _label_msg->setTextFont(&lv_font_montserrat_16);
         _label_msg->setTextColor(lv_color_hex(0xBFBFBF));
-        _label_msg->align(LV_ALIGN_CENTER, 0, 14);
+        _label_msg->align(LV_ALIGN_CENTER, 0, 22);
         _label_msg->setText("Starting up ...");
 
         _label_version = std::make_unique<uitk::lvgl_cpp::Label>(_panel->get());
@@ -149,6 +156,7 @@ public:
 private:
     std::unique_ptr<uitk::lvgl_cpp::Container> _panel;
     std::unique_ptr<uitk::lvgl_cpp::Label> _label_logo;
+    std::unique_ptr<uitk::lvgl_cpp::Label> _label_subtitle;
     std::unique_ptr<uitk::lvgl_cpp::Label> _label_msg;
     std::unique_ptr<uitk::lvgl_cpp::Label> _label_version;
 };

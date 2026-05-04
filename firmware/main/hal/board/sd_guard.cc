@@ -11,6 +11,7 @@
 #include <soc/spi_periph.h>
 #include <mooncake_log.h>
 #include <fmt/format.h>
+#include <atomic>
 #include <cassert>
 
 namespace stackchan::hal {
@@ -24,9 +25,10 @@ constexpr gpio_num_t  _gpio_sd_cs   = GPIO_NUM_4;
 // signal — i.e., effectively "disconnect" the signal from any physical pad.
 constexpr uint32_t    _matrix_in_low = 0x3C;
 
-bool          _mounted      = false;
-sdmmc_card_t* _card         = nullptr;
-bool          _guard_active = false;
+bool             _mounted        = false;
+sdmmc_card_t*    _card           = nullptr;
+std::atomic<bool> _guard_active{false};
+std::atomic<bool> _extra_touch_skip{false};
 
 void enter_sd_mode()
 {
@@ -74,8 +76,8 @@ bool mount_sd()
 
 SdGuard::SdGuard()
 {
-    assert(!_guard_active && "nested SdGuard not allowed");
-    _guard_active = true;
+    assert(!_guard_active.load() && "nested SdGuard not allowed");
+    _guard_active.store(true);
 
     GetHAL().lvglLock();
     enter_sd_mode();
@@ -85,7 +87,7 @@ SdGuard::~SdGuard()
 {
     exit_sd_mode();
     GetHAL().lvglUnlock();
-    _guard_active = false;
+    _guard_active.store(false);
 }
 
 bool SdGuard::ensureMounted()
@@ -105,6 +107,16 @@ bool SdGuard::isMounted()
 bool SdGuard::isInserted()
 {
     return hal_bridge::board_is_sd_inserted();
+}
+
+bool SdGuard::isActive()
+{
+    return _guard_active.load() || _extra_touch_skip.load();
+}
+
+void SdGuard::setExtraTouchSkip(bool skip)
+{
+    _extra_touch_skip.store(skip);
 }
 
 }  // namespace stackchan::hal

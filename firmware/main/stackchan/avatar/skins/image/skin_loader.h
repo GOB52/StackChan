@@ -45,10 +45,8 @@ bool load_avatar_index(AvatarIndex& out, std::string& err);
 // into PSRAM (out PngBuffers). Caller owns out (move into ImageAvatar).
 bool load_image_avatar_config(const std::string& skin_dir, ImageAvatarConfig& out, std::string& err);
 
-// NVS-backed current skin selection (Phase 1.5b).
-// get_current_skin_id_nvs(): returns persisted skin id, or empty string if not set / NVS error.
-// set_current_skin_id_nvs(): persist selection. Returns true on success.
-std::string get_current_skin_id_nvs();
-bool        set_current_skin_id_nvs(const std::string& id);
+// NVS access for current skin selection lives in stackchan/gob_fork_nvs.h
+// (namespace stackchan::gob_fork). This loader consults it; callers wishing
+// to read/write the selection should include that header directly.
 
 }  // namespace stackchan::avatar::image

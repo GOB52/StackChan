@@ -18,6 +18,7 @@
 #include <esp_timer.h>
 #include "stackchan_camera.h"
 #include "hal_bridge.h"
+#include "sd_guard.h"
 
 #define TAG "M5Stack-StackChan-Board"
 
@@ -308,6 +309,9 @@ private:
         esp_timer_create_args_t timer_args = {
             .callback =
                 [](void* arg) {
+                    // SD アクセス中は I2C bus 競合 (touchpad I2C timeout → abort) を
+                    // 避けるため touchpad poll を skip する。SdGuard 生存中のみ。
+                    if (stackchan::hal::SdGuard::isActive()) return;
                     M5StackCoreS3Board* board = (M5StackCoreS3Board*)arg;
                     board->PollTouchpad();
                 },

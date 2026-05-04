@@ -15,6 +15,7 @@
 #include <lvgl.h>
 #include <lvgl_theme.h>
 #include <stackchan/stackchan.h>
+#include <stackchan/avatar/skins/image/skin_loader.h>
 #include <assets/lang_config.h>
 #include <hal/hal.h>
 
@@ -250,8 +251,19 @@ void StackChanAvatarDisplay::SetupUI()
 
     ESP_LOGI(TAG, "Creating Stack-chan Avatar...");
 
-    auto avatar = std::make_unique<DefaultAvatar>();
-    avatar->init(lv_screen_active());
+    // GOB fork: share the same NVS-backed skin selection as AVATAR app so AI
+    // Agent mode also reflects the user's chosen skin (or DefaultAvatar via the
+    // "__default__" sentinel). load_avatar_or_fallback handles SD mount, LVGL
+    // lock recursion (already inside DisplayLockGuard), and falls back to
+    // DefaultAvatar on any SD/JSON/PNG failure.
+    auto skin_result = stackchan::avatar::image::load_avatar_or_fallback(lv_screen_active());
+    if (!skin_result.error_message.empty()) {
+        ESP_LOGW(TAG, "Skin fallback to DefaultAvatar: %s",
+                 skin_result.error_message.c_str());
+    }
+    ESP_LOGI(TAG, "Loaded skin: %s", skin_result.loaded_skin_id.c_str());
+
+    auto avatar = std::move(skin_result.avatar);
     avatar->getPanel()->onClick().connect([]() {
         if (hal_bridge::is_xiaozhi_ready()) {
             hal_bridge::toggle_xiaozhi_chat_state();

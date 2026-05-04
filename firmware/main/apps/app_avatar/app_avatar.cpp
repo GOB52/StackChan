@@ -19,10 +19,6 @@
 // (no card / mount fail / JSON or PNG missing) falls back to DefaultAvatar.
 #define USE_PONKO_AVATAR 1
 
-// Phase 1.5b on-device test: force NVS current_skin to a specific id at app open.
-// Empty string = no override. Useful to switch between "ponko"/"robot" without UI.
-#define FORCE_NVS_SKIN_ID ""
-
 // 1 = cycle Neutral/Happy/Angry/Sad every 5s for emotion + decorator pipeline check
 #define ENABLE_EMOTION_TEST 1
 
@@ -108,14 +104,9 @@ void AppAvatar::onOpen()
     std::string skin_load_error;  // populated only on SD load error → top toast after attach
 #if USE_PONKO_AVATAR
     {
-        // Optional Phase 1.5b on-device test: write FORCE_NVS_SKIN_ID to NVS so the
-        // loader picks it up on this run.
-        if (sizeof(FORCE_NVS_SKIN_ID) > 1) {  // not empty
-            avatar::image::set_current_skin_id_nvs(FORCE_NVS_SKIN_ID);
-            mclog::tagInfo(getAppInfo().name, "FORCE_NVS_SKIN_ID applied: {}", FORCE_NVS_SKIN_ID);
-        }
         // SD-only loader: returns ImageAvatar on success, DefaultAvatar on any failure
         // (no card / mount fail / JSON or PNG missing). error_message is populated on failure.
+        // NVS-based skin selection is managed via the GOB FORK app's Skin Browser.
         auto skin = avatar::image::load_avatar_or_fallback(lv_screen_active());
         if (!skin.error_message.empty()) {
             skin_load_error = skin.error_message;
