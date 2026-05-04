@@ -34,5 +34,17 @@ add_definitions(-DGOB_FORK_GIT_HASH=\"${GOB_FORK_GIT_HASH}\")
 # Add this line to disable the specific warning
 add_compile_options(-Wno-missing-field-initializers)
 
+# Register M5Stack libraries linked under components/m5unit_local/ as
+# ESP-IDF components. Each subdir provides its own CMakeLists.txt; the
+# library sources are designed to compile without Arduino — Arduino-only
+# code paths are gated with #if defined(ARDUINO) so only ESP-IDF native
+# branches are built here.
+set(EXTRA_COMPONENT_DIRS
+    ${CMAKE_CURRENT_LIST_DIR}/components/m5unit_local/M5Utility
+    ${CMAKE_CURRENT_LIST_DIR}/components/m5unit_local/M5HAL
+    ${CMAKE_CURRENT_LIST_DIR}/components/m5unit_local/M5UnitUnified
+    ${CMAKE_CURRENT_LIST_DIR}/components/m5unit_local/M5Unit-NFC
+)
+
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(stack-chan)

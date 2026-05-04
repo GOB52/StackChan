@@ -53,6 +53,16 @@ enum class ImuMotionEvent {
 };
 
 /**
+ * @brief NFC tag detection event payload (GOB fork: M5Unit-NFC integration).
+ * Phase 1a: UID + classified type only. NDEF / cmd payload decoding planned
+ * for Phase 1b.
+ */
+struct NfcTagEvent_t {
+    std::string uid;   // hex string (e.g. "04A1B2C3D4E5F6")
+    std::string type;  // classified PICC type (e.g. "MIFARE Classic 1K")
+};
+
+/**
  * @brief
  *
  */
@@ -241,6 +251,15 @@ public:
     /* ----------------------------------- IMU ---------------------------------- */
     uitk::Signal<ImuMotionEvent> onImuMotionEvent;
 
+    /* ----------------------------------- NFC ---------------------------------- */
+    // GOB fork: M5Unit-NFC tag detection. Phase 1a — UID/type only.
+    uitk::Signal<const NfcTagEvent_t&> onNfcTagDetected;
+    // Lazily initialize UnitNFC + start poll task. Called from the
+    // stackchan update task once xiaozhi is ready, so that the audio
+    // codec init (ES7210 / AW88298) gets the I2C bus first without
+    // contention from the NFC poll loop.
+    void startNfc();
+
     /* ---------------------------------- Time ---------------------------------- */
     void syncRtcTimeToSystem();
     void syncSystemTimeToRtc();
@@ -299,6 +318,7 @@ private:
     void head_touch_init();
     void io_expander_init();
     void imu_init();
+    void nfc_init();  // GOB fork: M5Unit-NFC
     void rtc_init();
 };
 

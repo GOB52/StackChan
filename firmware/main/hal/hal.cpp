@@ -39,6 +39,9 @@ void Hal::init()
     io_expander_init();
     rtc_init();
     imu_init();
+    // NFC は xiaozhi audio codec init (ES7210/AW88298) と I2C bus を
+    // 共有するため、ここでは初期化しない。xiaozhi 起動完了後に
+    // _stackchan_update_task から startNfc() で遅延初期化する。
     servo_init();
     lvgl_init();
 }
@@ -180,6 +183,8 @@ static void _stackchan_update_task(void* param)
             GetHAL().startSntp();
             view::create_home_indicator([]() { GetHAL().requestWarmReboot(0); }, 0x81DBBD, 0x134233);
             view::create_status_bar(0x81DBBD, 0x134233);
+            // GOB fork: NFC を遅延初期化 (audio codec init を妨げないため)
+            GetHAL().startNfc();
             is_setup_done = true;
         }
 

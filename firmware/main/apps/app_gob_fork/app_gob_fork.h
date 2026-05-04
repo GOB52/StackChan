@@ -38,6 +38,7 @@ private:
         ResetNvs,         // clear NVS → AVATAR uses avatar.json's current
         UseDefaultAvatar, // NVS = "__default__" → AVATAR uses DefaultAvatar
         RestartDevice,    // GetHAL().reboot() (cold restart, returns to Launcher)
+        ToggleNfc,        // flip NVS nfc_enabled and reboot to apply
     };
 
     Page _current_page    = Page::Main;

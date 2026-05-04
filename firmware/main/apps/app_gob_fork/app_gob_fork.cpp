@@ -167,6 +167,18 @@ void AppGobFork::build_main_menu()
                      _switch_pending = true;
                      _pending_page   = Page::SdCardInfo;
                  }},
+                {std::string("NFC: ") +
+                     (stackchan::gob_fork::get_nfc_enabled() ? "ON" : "OFF"),
+                 [&]() {
+                     bool now_enabled = stackchan::gob_fork::get_nfc_enabled();
+                     show_confirm_dialog(
+                         now_enabled ? "Disable NFC?" : "Enable NFC?",
+                         now_enabled
+                             ? "Stop UnitNFC poll task and reboot."
+                             : "Start UnitNFC poll task after reboot. May affect audio "
+                               "stability while AI Agent is running.",
+                         PendingMenuAction::ToggleNfc);
+                 }},
                 {"Restart Device",
                  [&]() {
                      show_confirm_dialog("Restart Device?",
@@ -298,6 +310,16 @@ void AppGobFork::perform_menu_action(PendingMenuAction action)
             mclog::tagInfo(getAppInfo().name, "restart device");
             GetHAL().reboot();
             break;
+        case PendingMenuAction::ToggleNfc: {
+            bool new_state = !stackchan::gob_fork::get_nfc_enabled();
+            if (!stackchan::gob_fork::set_nfc_enabled(new_state)) {
+                view::pop_a_toast("NVS save failed", view::ToastType::Error, 2000);
+                return;
+            }
+            mclog::tagInfo(getAppInfo().name, "NFC -> {}, rebooting", new_state ? "ON" : "OFF");
+            GetHAL().reboot();
+            break;
+        }
         case PendingMenuAction::None:
             break;
     }
