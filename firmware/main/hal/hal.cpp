@@ -5,6 +5,7 @@
  */
 // Modified by GOB (X:@GOB_52_GOB / GitHub:GOB52) - StackChan firmware fork
 #include "hal.h"
+#include "../stackchan/nfc/nfc_cmd_dispatcher.h"
 #include <memory>
 #include <mooncake_log.h>
 #include <nvs_flash.h>
@@ -185,6 +186,9 @@ static void _stackchan_update_task(void* param)
             view::create_status_bar(0x81DBBD, 0x134233);
             // GOB fork: NFC を遅延初期化 (audio codec init を妨げないため)
             GetHAL().startNfc();
+            // GOB fork: stackchan:cmd dispatcher を起動。NFC opt-out 時でも
+            // 害はない (signal が emit されないだけ) ので無条件で初期化。
+            stackchan::nfc::CmdDispatcher::initOnce();
             is_setup_done = true;
         }
 
