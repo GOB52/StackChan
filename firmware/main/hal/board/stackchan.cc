@@ -19,6 +19,7 @@
 #include "stackchan_camera.h"
 #include "hal_bridge.h"
 #include "sd_guard.h"
+#include "../hal.h"  // GOB fork: Hal::isNfcBusy() for FT6336 / NFC I2C arbitration
 
 #define TAG "M5Stack-StackChan-Board"
 
@@ -312,6 +313,11 @@ private:
                     // SD アクセス中は I2C bus 競合 (touchpad I2C timeout → abort) を
                     // 避けるため touchpad poll を skip する。SdGuard 生存中のみ。
                     if (stackchan::hal::SdGuard::isActive()) return;
+                    // GOB fork: NFC poll task (core 1) が I2C を使用中なら skip。
+                    // 同 I2C bus を別コアから同時取得すると FT6336 timeout +
+                    // bus stuck (ESP_ERR_INVALID_STATE) → reboot に至るため、
+                    // この 1 周期 (20ms) を諦めることで安全側に倒す。
+                    if (Hal::isNfcBusy()) return;
                     M5StackCoreS3Board* board = (M5StackCoreS3Board*)arg;
                     board->PollTouchpad();
                 },

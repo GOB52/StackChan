@@ -14,6 +14,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <mooncake_log.h>
+#include <atomic>
 #include <memory>
 #include <vector>
 
@@ -31,12 +32,24 @@ std::unique_ptr<m5::nfc::NFCLayerA>        _nfc_a;
 std::unique_ptr<m5::nfc::ndef::NDEFLayer>  _ndef;
 
 constexpr const char* _STACKCHAN_CMD_MIME = "application/vnd.stackchan.cmd+json";
+
+// True while the poll task is mid-iteration (units->update / detect /
+// identify / NDEF read). FT6336 esp_timer (core 0) checks this and skips
+// its 20ms touch poll to avoid cross-core I2C contention with this task
+// (core 1). Atomic so cross-core load/store is well defined.
+std::atomic<bool> _nfc_busy{false};
 }  // namespace
+
+bool Hal::isNfcBusy()
+{
+    return _nfc_busy.load(std::memory_order_acquire);
+}
 
 static void _nfc_task(void* /*param*/)
 {
     while (1) {
         if (_units && _unit_nfc && _nfc_a) {
+            _nfc_busy.store(true, std::memory_order_release);
             _units->update();
 
             std::vector<m5::nfc::a::PICC> piccs;
@@ -141,6 +154,7 @@ static void _nfc_task(void* /*param*/)
                 }
                 _nfc_a->deactivate();
             }
+            _nfc_busy.store(false, std::memory_order_release);
         }
         // runs at all when get_nfc_enabled() == true.
         vTaskDelay(pdMS_TO_TICKS(100));
@@ -188,10 +202,13 @@ void Hal::nfc_init()
 
     _nfc_a = std::make_unique<m5::nfc::NFCLayerA>(*_unit_nfc);
     _ndef  = std::make_unique<m5::nfc::ndef::NDEFLayer>(*_nfc_a);
-    mclog::tagInfo(_tag, "UnitNFC ready, starting poll task (core0, prio1, 1000ms)");
+    mclog::tagInfo(_tag, "UnitNFC ready, starting poll task (core1, prio1, 100ms)");
 
-    // Pin to core 0 so std::this_thread::yield() inside ST25R3916 polling loops
-    // can let the FT6336 esp_timer callback (also on core 0) preempt and access
-    // the shared I2C bus. Priority 1 keeps xiaozhi audio (high prio) ahead.
-    xTaskCreatePinnedToCore(_nfc_task, "nfc", 6144, NULL, 1, NULL, 0);
+    // Pin to core 1 to avoid CPU starvation during AI speech: xiaozhi's audio
+    // AEC tasks on core 0 run at high priority and preempt this low-prio NFC
+    // poll task continuously while TTS is active, making PICCs undetectable.
+    // FT6336 abort protection that previously required core 0 colocation is
+    // now provided by the xiaozhi-esp32.patch i2c_device.cc retry-on-timeout
+    // patch (SW1), so core 1 is safe.
+    xTaskCreatePinnedToCore(_nfc_task, "nfc", 6144, NULL, 1, NULL, 1);
 }

@@ -274,6 +274,11 @@ public:
     // codec init (ES7210 / AW88298) gets the I2C bus first without
     // contention from the NFC poll loop.
     void startNfc();
+    // True while the NFC poll task is mid-iteration (detect / identify /
+    // NDEF read in progress). Other I2C consumers on a different core
+    // (notably the FT6336 touchpad esp_timer on core 0) check this and
+    // skip their poll cycle to avoid cross-core I2C contention.
+    static bool isNfcBusy();
 
     /* ---------------------------------- Time ---------------------------------- */
     void syncRtcTimeToSystem();
