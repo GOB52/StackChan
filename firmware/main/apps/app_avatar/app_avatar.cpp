@@ -20,10 +20,10 @@
 #define USE_PONKO_AVATAR 1
 
 // 1 = cycle Neutral/Happy/Angry/Sad every 5s for emotion + decorator pipeline check
-#define ENABLE_EMOTION_TEST 1
+#define ENABLE_EMOTION_TEST 0
 
 // 1 = always-on SpeakingModifier (mouth flapping) for mouth animation check
-#define ENABLE_SPEAKING_TEST 1
+#define ENABLE_SPEAKING_TEST 0
 
 #if USE_PONKO_AVATAR
 #include <stackchan/avatar/skins/image/skin_loader.h>
