@@ -92,6 +92,7 @@ void SystemInfoPage::build_ui()
     std::string labels =
         "Heap free:\n"
         "PSRAM free:\n"
+        "Battery:\n"
         "Uptime:\n"
         "CPU freq:\n"
         "Chip:\n"
@@ -100,6 +101,7 @@ void SystemInfoPage::build_ui()
     std::string values = fmt::format(
         "{}\n"
         "{:.1f} / {:.1f} MB\n"
+        "{}% ({})\n"
         "{}\n"
         "{} MHz\n"
         "ESP32-S{} rev{} ({}c)\n"
@@ -108,6 +110,8 @@ void SystemInfoPage::build_ui()
         format_kb_pair(heap_free, heap_total),
         psram_free / (1024.0 * 1024.0),
         psram_total / (1024.0 * 1024.0),
+        GetHAL().getBatteryLevel(),
+        GetHAL().isBatteryCharging() ? "CHG" : "BAT",
         format_uptime(GetHAL().millis()),
         cpu_hz / 1000000,
         static_cast<int>(chip.model),

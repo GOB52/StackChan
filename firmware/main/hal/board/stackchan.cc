@@ -69,6 +69,12 @@ public:
             ESP_LOGI(TAG, "Set charge current success");
         }
 
+        // GOB fork: AXP2101 charge-related register dump for charging diagnostics.
+        // 0x18 bit1 = CHG_EN (charge enable). 0x62 = ICC_CHG_SET (constant charge current).
+        // 0x14 = Min sys voltage. 0x16 = VBUS input current limit.
+        ESP_LOGI(TAG, "AXP2101 reg dump: 0x18=0x%02X 0x62=0x%02X 0x14=0x%02X 0x16=0x%02X",
+                 ReadReg(0x18), ReadReg(0x62), ReadReg(0x14), ReadReg(0x16));
+
         SetBrightness(0);
     }
 
