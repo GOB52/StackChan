@@ -98,8 +98,23 @@ public:
         _timeline.start();
     }
 
+    // Release ModifyLock if still held (covers both natural finish via
+    // requestDestroy() and external removeModifier()).
+    ~DanceModifier() override
+    {
+        if (_owner) {
+            _owner->motion().setModifyLock(false);
+            _owner->avatar().setModifyLock(false);
+        }
+    }
+
     void _update(Modifiable& stackchan) override
     {
+        if (!_owner) {
+            _owner = &stackchan;
+            stackchan.motion().setModifyLock(true);
+            stackchan.avatar().setModifyLock(true);
+        }
         _timeline.update();
         if (_timeline.isFinished()) {
             requestDestroy();
@@ -108,6 +123,7 @@ public:
 
 private:
     animation::Timeline _timeline;
+    Modifiable* _owner = nullptr;
 };
 
 }  // namespace stackchan

@@ -7,6 +7,7 @@
 #include <mooncake_log.h>
 #include <mcp_server.h>
 #include <stackchan/stackchan.h>
+#include <stackchan/actions/robot_actions.h>
 #include <apps/common/common.h>
 
 using namespace stackchan;
@@ -91,6 +92,40 @@ void Hal::xiaozhi_mcp_init()
 
             return true;
         });
+
+    mclog::tagInfo(_tag, "add robot.head_home tool");
+    mcp_server.AddTool("self.robot.head_home",
+                       "Move the head back to the neutral home position (yaw=0, pitch=0). "
+                       "Speed is in servo units (100=slow, 1000=fast, 500=natural).",
+                       PropertyList({Property("speed", kPropertyTypeInteger, 500, 100, 1000)}),
+                       [](const PropertyList& properties) -> ReturnValue {
+                           int speed = properties["speed"].value<int>();
+                           stackchan::actions::head_home(speed);
+                           return true;
+                       });
+
+    mclog::tagInfo(_tag, "add robot.dance tool");
+    mcp_server.AddTool("self.robot.dance",
+                       "Play a dance animation. Styles: "
+                       "'happy' (sway side-to-side, smiling), "
+                       "'robot' (stiff jerky moves), "
+                       "'panic' (fast shaking, surprised eyes), "
+                       "'look_around' (slow scan of the room). "
+                       "Any in-flight dance is replaced.",
+                       PropertyList({Property("style", kPropertyTypeString, std::string("happy"))}),
+                       [](const PropertyList& properties) -> ReturnValue {
+                           std::string style = properties["style"].value<std::string>();
+                           return stackchan::actions::dance(style);
+                       });
+
+    mclog::tagInfo(_tag, "add robot.stop_dance tool");
+    mcp_server.AddTool("self.robot.stop_dance",
+                       "Stop the currently playing dance (if any). "
+                       "Returns false when no dance is active.",
+                       std::vector<Property>{},
+                       [](const PropertyList& properties) -> ReturnValue {
+                           return stackchan::actions::stop_dance();
+                       });
 
     mclog::tagInfo(_tag, "add robot.create_reminder tool");
     mcp_server.AddTool("self.robot.create_reminder",

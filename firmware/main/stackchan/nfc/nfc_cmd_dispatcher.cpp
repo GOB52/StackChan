@@ -4,6 +4,7 @@
 #include "../../hal/board/hal_bridge.h"
 #include "../../assets/assets.h"
 #include "../stackchan.h"
+#include "../actions/robot_actions.h"
 #include "../avatar/decorators/toast_decorator.h"
 #include <mooncake_log.h>
 #include <cstdio>
@@ -133,21 +134,35 @@ void CmdDispatcher::initOnce()
         stackchan::avatar::pop_avatar_toast(buf, view::ToastType::Info, _TOAST_MS);
     });
 
-    // Phase 2b will add MCP tools self.robot.head_home / self.robot.dance and
-    // wire these handlers to call the same underlying APIs.
+    // Phase 2b — wired to actions/ shared layer. The same logic powers
+    // the corresponding self.robot.* MCP tools so AI voice and NFC tags
+    // produce identical behavior. See stackchan/actions/robot_actions.{h,cpp}.
     d.registerHandler("home", [](const ArduinoJson::JsonObjectConst& args) {
         int s = args["s"] | 500;
-        mclog::tagInfo(_tag, "[stub] home s={}", s);
+        mclog::tagInfo(_tag, "home s={}", s);
+        stackchan::actions::head_home(s);
         char buf[64];
         std::snprintf(buf, sizeof(buf), "%% NFC.home(s=%d)", s);
         stackchan::avatar::pop_avatar_toast(buf, view::ToastType::Info, _TOAST_MS);
     });
     d.registerHandler("dance", [](const ArduinoJson::JsonObjectConst& args) {
-        int id = args["id"] | 0;
-        mclog::tagInfo(_tag, "[stub] dance id={}", id);
-        char buf[64];
-        std::snprintf(buf, sizeof(buf), "%% NFC.dance(id=%d)", id);
+        // MCP tool uses string "style"; NFC payload uses the same key for
+        // consistency. Default is "happy" (matches MCP default).
+        std::string style = args["style"].as<const char*>() ? args["style"].as<const char*>() : "happy";
+        mclog::tagInfo(_tag, "dance style={}", style);
+        bool ok = stackchan::actions::dance(style);
+        char buf[96];
+        std::snprintf(buf, sizeof(buf),
+                      ok ? "%% NFC.dance(style=%s)" : "%% NFC.dance(unknown style=%s)",
+                      style.c_str());
         stackchan::avatar::pop_avatar_toast(buf, view::ToastType::Info, _TOAST_MS);
+    });
+    d.registerHandler("stop_dance", [](const ArduinoJson::JsonObjectConst& args) {
+        bool stopped = stackchan::actions::stop_dance();
+        mclog::tagInfo(_tag, "stop_dance stopped={}", stopped);
+        stackchan::avatar::pop_avatar_toast(
+            stopped ? "% NFC.stop_dance(stopped)" : "% NFC.stop_dance(no dance)",
+            view::ToastType::Info, _TOAST_MS);
     });
 
     d.connectToHal();
