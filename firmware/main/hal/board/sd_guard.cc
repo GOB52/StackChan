@@ -90,13 +90,29 @@ SdGuard::~SdGuard()
     _guard_active.store(false);
 }
 
-bool SdGuard::ensureMounted()
+bool SdGuard::mount()
 {
     if (_mounted) {
         return true;
     }
     _mounted = mount_sd();
     return _mounted;
+}
+
+bool SdGuard::unmount()
+{
+    if (!_mounted) {
+        return true;
+    }
+    esp_err_t e = esp_vfs_fat_sdcard_unmount("/sdcard", _card);
+    if (e != ESP_OK) {
+        mclog::tagWarn(_tag, "esp_vfs_fat_sdcard_unmount failed: 0x{:x}", static_cast<int>(e));
+        return false;
+    }
+    _card    = nullptr;
+    _mounted = false;
+    mclog::tagInfo(_tag, "unmounted /sdcard");
+    return true;
 }
 
 bool SdGuard::isMounted()
@@ -127,7 +143,8 @@ void SdGuard::performEarlyProbe()
     }
     mclog::tagInfo(_tag, "early probe: handshake with SD card");
     SdGuard guard;
-    (void)guard.ensureMounted();  // result irrelevant; goal is the SPI handshake
+    (void)mount();    // result irrelevant; goal is the SPI handshake
+    unmount();        // GOB fork: 起動時 handshake のみ、即 unmount で省電
 }
 
 }  // namespace stackchan::hal

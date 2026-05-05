@@ -212,9 +212,12 @@ void AppGobFork::enter_skin_browser()
     AvatarIndex idx;
     std::string err;
     bool ok = false;
+    // GOB fork: SkinBrowser page lifecycle 全期間で mount 維持。次/前 skin の
+    // load_current_skin (SkinBrowserPage 内) は mount 状態を前提にする。
+    // page 終了時 (on_back / on_apply) で unmount。
     {
         stackchan::hal::SdGuard guard;
-        if (guard.ensureMounted()) {
+        if (stackchan::hal::SdGuard::mount()) {
             ok = load_avatar_index(idx, err);
         } else {
             err = "SD mount failed";
@@ -222,6 +225,7 @@ void AppGobFork::enter_skin_browser()
     }
 
     if (!ok || idx.skins.empty()) {
+        stackchan::hal::SdGuard::unmount();  // mount 失敗 / 空 index でも念のため
         mclog::tagWarn(getAppInfo().name, "skin index load failed: {}", err);
         view::pop_a_toast(err.empty() ? "No SD / avatar.json" : err,
                           view::ToastType::Error, 2400);
@@ -238,9 +242,11 @@ void AppGobFork::enter_skin_browser()
             return;
         }
         mclog::tagInfo(getAppInfo().name, "skin saved: {}", id);
+        stackchan::hal::SdGuard::unmount();  // GOB fork: page 終了で unmount
         close();
     };
     auto on_back = [this]() {
+        stackchan::hal::SdGuard::unmount();  // GOB fork: page 終了で unmount
         _switch_pending = true;
         _pending_page   = Page::Main;
     };

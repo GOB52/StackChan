@@ -72,7 +72,8 @@ SdCardInfoPage::InfoSnapshot SdCardInfoPage::collect_info()
 
     {
         stackchan::hal::SdGuard guard;
-        if (!guard.ensureMounted()) {
+        stackchan::hal::SdGuard::MountGuard mg;
+        if (!mg.ok()) {
             snap.error_message = "SD mount failed.";
             return snap;
         }

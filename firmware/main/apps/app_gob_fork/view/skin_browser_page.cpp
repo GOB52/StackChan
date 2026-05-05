@@ -258,10 +258,12 @@ void SkinBrowserPage::perform_load_current()
     std::string skin_dir  = "/sdcard/" + id;
     {
         stackchan::hal::SdGuard guard;
-        if (!guard.ensureMounted()) {
+        // GOB fork: caller (AppGobFork::enter_skin_browser) で page lifecycle
+        // 全期間 mount 済み前提。ここでは mount 状態のチェックのみ。
+        if (!stackchan::hal::SdGuard::isMounted()) {
             _load_failed = true;
-            _load_err    = "SD mount failed";
-            mclog::tagError(_tag, "SD mount failed");
+            _load_err    = "SD not mounted";
+            mclog::tagError(_tag, "SD not mounted (caller should mount first)");
             update_info_labels();
             return;
         }

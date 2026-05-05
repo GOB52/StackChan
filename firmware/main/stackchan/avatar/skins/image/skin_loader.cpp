@@ -386,7 +386,8 @@ SkinLoadResult load_avatar_or_fallback(lv_obj_t* parent)
     std::string skin_id;
     {
         hal::SdGuard guard;
-        if (!guard.ensureMounted()) {
+        hal::SdGuard::MountGuard mg;
+        if (!mg.ok()) {
             mclog::tagError(_tag, "SD mount failed");
             return make_default_fallback(parent, "SD mount failed");
         }
