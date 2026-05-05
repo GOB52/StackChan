@@ -47,6 +47,7 @@ private:
 
     std::vector<view::SelectMenuPage::MenuSection> _menu_sections;
     std::unique_ptr<view::SelectMenuPage>          _menu_page;
+    int _saved_main_scroll_y = 0;  // preserved across Main rebuilds and sub-page returns
 
     std::unique_ptr<stackchan::gob_fork::view::SkinBrowserPage>           _skin_browser;
     std::unique_ptr<stackchan::gob_fork::view::SystemInfoPage>            _system_info_page;

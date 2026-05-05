@@ -71,6 +71,13 @@ void AppGobFork::onRunning()
 
     if (_switch_pending) {
         _switch_pending = false;
+
+        // Save Main scroll position before tearing down (covers Main→Main
+        // rebuild like Time toggle, and sub-page return like About → Back).
+        if (_current_page == Page::Main && _menu_page) {
+            _saved_main_scroll_y = _menu_page->getScrollY();
+        }
+
         _menu_page.reset();
         _skin_browser.reset();
         _system_info_page.reset();
@@ -86,6 +93,10 @@ void AppGobFork::onRunning()
             case Page::SdCardInfo:          enter_sd_card_info();          break;
             case Page::About:               enter_about();                 break;
             case Page::ScreensaverSettings: enter_screensaver_settings();  break;
+        }
+
+        if (_current_page == Page::Main && _menu_page) {
+            _menu_page->setScrollY(_saved_main_scroll_y);
         }
     }
 
@@ -170,7 +181,7 @@ void AppGobFork::build_main_menu()
                 {std::string("NFC: ") +
                      (stackchan::gob_fork::get_nfc_enabled() ? "ON" : "OFF"),
                  [&]() {
-                     bool now_enabled = stackchan::gob_fork::get_nfc_enabled();
+                     const bool now_enabled = stackchan::gob_fork::get_nfc_enabled();
                      show_confirm_dialog(
                          now_enabled ? "Disable NFC?" : "Enable NFC?",
                          now_enabled
@@ -178,6 +189,21 @@ void AppGobFork::build_main_menu()
                              : "Start UnitNFC poll task after reboot. May affect audio "
                                "stability while AI Agent is running.",
                          PendingMenuAction::ToggleNfc);
+                 }},
+                {std::string("Time: ") +
+                     (stackchan::gob_fork::get_time_format_24h() ? "24H" : "12H"),
+                 [&]() {
+                     const bool new_state = !stackchan::gob_fork::get_time_format_24h();
+                     if (!stackchan::gob_fork::set_time_format_24h(new_state)) {
+                         view::pop_a_toast("NVS save failed", view::ToastType::Error, 2000);
+                         return;
+                     }
+                     mclog::tagInfo(getAppInfo().name, "Time format -> {}",
+                                    new_state ? "24H" : "12H");
+                     // Re-enter Main page so the menu rebuilds and the label
+                     // ("Time: 12H" / "Time: 24H") reflects the new state.
+                     _switch_pending = true;
+                     _pending_page   = Page::Main;
                  }},
                 {"Restart Device",
                  [&]() {

@@ -38,6 +38,11 @@ public:
 
     void update();
 
+    // GOB fork: scroll position get/set so callers can preserve the user's
+    // place across menu rebuilds (e.g. after a toggle that just edits a label).
+    int  getScrollY() const;
+    void setScrollY(const int y);
+
 private:
     std::vector<MenuSection> _sections;
     Colors _colors;

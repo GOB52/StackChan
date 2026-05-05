@@ -29,13 +29,19 @@ bool        clear_skin_current();
 // if unset or on NVS error.
 uint32_t    get_screensaver_timeout_s();
 // Persist screensaver timeout (seconds; 0 = Off). Returns true on success.
-bool        set_screensaver_timeout_s(uint32_t s);
+bool        set_screensaver_timeout_s(const uint32_t s);
 
 // --- NFC enable (NVS key: "nfc_enabled") ------------------------------------
 // Default OFF: UnitNFC poll task interferes with audio codec / DSP timing
 // on the shared I2C bus and causes AFE FEED ringbuffer overruns when running
 // alongside xiaozhi. Users opt in explicitly when they want NFC.
 bool        get_nfc_enabled();
-bool        set_nfc_enabled(bool enabled);
+bool        set_nfc_enabled(const bool enabled);
+
+// --- Status bar time format (NVS key: "time_24h") ---------------------------
+// Default false (12H "3:45 PM" — matches upstream behavior).
+// true selects 24H "15:45".
+bool        get_time_format_24h();
+bool        set_time_format_24h(const bool use24h);
 
 }  // namespace stackchan::gob_fork

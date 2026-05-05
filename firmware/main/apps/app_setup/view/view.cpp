@@ -54,6 +54,17 @@ void SelectMenuPage::update()
     }
 }
 
+// GOB fork: scroll position get/set (see header comment).
+int SelectMenuPage::getScrollY() const
+{
+    return lv_obj_get_scroll_y(_pannel->raw_ptr());
+}
+
+void SelectMenuPage::setScrollY(const int y)
+{
+    lv_obj_scroll_to_y(_pannel->raw_ptr(), y, LV_ANIM_OFF);
+}
+
 void SelectMenuPage::create_selection_label(int x, int y, std::string_view text)
 {
     auto label = std::make_unique<uitk::lvgl_cpp::Label>(*_pannel);
