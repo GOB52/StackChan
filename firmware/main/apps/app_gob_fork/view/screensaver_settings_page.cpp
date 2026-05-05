@@ -61,17 +61,17 @@ void ScreensaverSettingsPage::build_ui()
         auto btn = std::make_unique<Button>(*_panel);
         btn->setSize(296, btn_h);
         btn->align(LV_ALIGN_TOP_LEFT, 12, y);
-        bool is_current = (opt.seconds == _current_s);
+        const bool is_current = (opt.seconds == _current_s);
         btn->setBgColor(lv_color_hex(is_current ? 0x4CAF50 : 0xC8E6C9));
         btn->setBorderWidth(0);
         btn->setShadowWidth(0);
         btn->setRadius(8);
-        std::string text = is_current ? fmt::format("{}  [current]", opt.label)
-                                      : std::string(opt.label);
+        const std::string text = is_current ? fmt::format("{}  [current]", opt.label)
+                                            : std::string(opt.label);
         btn->label().setText(text.c_str());
         btn->label().setTextFont(&lv_font_montserrat_14);
         btn->label().setTextColor(lv_color_hex(is_current ? 0xFFFFFF : 0x1B5E20));
-        uint32_t target = opt.seconds;
+        const uint32_t target = opt.seconds;
         btn->onClick().connect([this, target]() { apply_choice(target); });
         _option_buttons.push_back(std::move(btn));
         y += btn_h + btn_gap;
@@ -96,7 +96,7 @@ void ScreensaverSettingsPage::build_ui()
     }
 }
 
-void ScreensaverSettingsPage::apply_choice(uint32_t seconds)
+void ScreensaverSettingsPage::apply_choice(const uint32_t seconds)
 {
     if (seconds == _current_s) {
         _back_pending = true;  // no change → just go back

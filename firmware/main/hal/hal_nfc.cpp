@@ -82,14 +82,14 @@ void parse_tlvs_and_collect(const std::vector<m5::nfc::ndef::TLV>& tlvs,
                             std::vector<NfcCmdEvent_t>& cmd_events)
 {
     size_t msg_tlvs = 0, total_records = 0, match_count = 0;
-    for (auto& tlv : tlvs) {
+    for (const auto& tlv : tlvs) {
         if (!tlv.isMessageTLV()) {
             mclog::tagInfo(_tag, "skip non-Message TLV (tag={})",
                            static_cast<int>(tlv.tag()));
             continue;
         }
         msg_tlvs++;
-        for (auto& rec : tlv.records()) {
+        for (const auto& rec : tlv.records()) {
             total_records++;
             const std::string rec_type(rec.type());
             const int         tnf_val = static_cast<int>(rec.tnf());
@@ -234,7 +234,7 @@ void Hal::nfc_init()
 {
     mclog::tagInfo(_tag, "init");
 
-    auto i2c_bus = hal_bridge::board_get_i2c_bus();
+    const auto i2c_bus = hal_bridge::board_get_i2c_bus();
     if (!i2c_bus) {
         mclog::tagError(_tag, "i2c bus not available");
         return;

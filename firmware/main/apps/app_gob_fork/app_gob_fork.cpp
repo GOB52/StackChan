@@ -57,7 +57,7 @@ void AppGobFork::onRunning()
 
     // Process queued menu action (Reset / UseDefault / Restart).
     if (_menu_action_pending != PendingMenuAction::None) {
-        auto action = _menu_action_pending;
+        const auto action = _menu_action_pending;
         _menu_action_pending = PendingMenuAction::None;
         perform_menu_action(action);
     }
@@ -293,7 +293,7 @@ void AppGobFork::enter_screensaver_settings()
         std::make_unique<stackchan::gob_fork::view::ScreensaverSettingsPage>(std::move(on_back));
 }
 
-void AppGobFork::perform_menu_action(PendingMenuAction action)
+void AppGobFork::perform_menu_action(const PendingMenuAction action)
 {
     switch (action) {
         case PendingMenuAction::ResetNvs:
@@ -317,7 +317,7 @@ void AppGobFork::perform_menu_action(PendingMenuAction action)
             GetHAL().reboot();
             break;
         case PendingMenuAction::ToggleNfc: {
-            bool new_state = !stackchan::gob_fork::get_nfc_enabled();
+            const bool new_state = !stackchan::gob_fork::get_nfc_enabled();
             if (!stackchan::gob_fork::set_nfc_enabled(new_state)) {
                 view::pop_a_toast("NVS save failed", view::ToastType::Error, 2000);
                 return;
@@ -333,9 +333,9 @@ void AppGobFork::perform_menu_action(PendingMenuAction action)
 
 // -- Confirm dialog (shared between menu actions) ---------------------------
 
-void AppGobFork::show_confirm_dialog(const char* title,
+void AppGobFork::show_confirm_dialog(const char* const title,
                                      const std::string& body,
-                                     PendingMenuAction on_yes)
+                                     const PendingMenuAction on_yes)
 {
     close_dialog();
 

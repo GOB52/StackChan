@@ -38,8 +38,8 @@ bool set_skin_current(const std::string& id)
 {
     nvs_handle_t h = 0;
     if (nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h) != ESP_OK) return false;
-    bool ok = (nvs_set_str(h, _key_skin_current, id.c_str()) == ESP_OK)
-              && (nvs_commit(h) == ESP_OK);
+    const bool ok = (nvs_set_str(h, _key_skin_current, id.c_str()) == ESP_OK)
+                    && (nvs_commit(h) == ESP_OK);
     nvs_close(h);
     return ok;
 }
@@ -48,8 +48,8 @@ bool clear_skin_current()
 {
     nvs_handle_t h = 0;
     if (nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h) != ESP_OK) return false;
-    esp_err_t e = nvs_erase_key(h, _key_skin_current);
-    bool ok = (e == ESP_OK || e == ESP_ERR_NVS_NOT_FOUND) && (nvs_commit(h) == ESP_OK);
+    const esp_err_t e = nvs_erase_key(h, _key_skin_current);
+    const bool ok = (e == ESP_OK || e == ESP_ERR_NVS_NOT_FOUND) && (nvs_commit(h) == ESP_OK);
     nvs_close(h);
     return ok;
 }
@@ -66,12 +66,12 @@ uint32_t get_screensaver_timeout_s()
     return v;
 }
 
-bool set_screensaver_timeout_s(uint32_t s)
+bool set_screensaver_timeout_s(const uint32_t s)
 {
     nvs_handle_t h = 0;
     if (nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h) != ESP_OK) return false;
-    bool ok = (nvs_set_u32(h, _key_screensaver_to, s) == ESP_OK)
-              && (nvs_commit(h) == ESP_OK);
+    const bool ok = (nvs_set_u32(h, _key_screensaver_to, s) == ESP_OK)
+                    && (nvs_commit(h) == ESP_OK);
     nvs_close(h);
     return ok;
 }
@@ -86,12 +86,12 @@ bool get_nfc_enabled()
     return v != 0;
 }
 
-bool set_nfc_enabled(bool enabled)
+bool set_nfc_enabled(const bool enabled)
 {
     nvs_handle_t h = 0;
     if (nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h) != ESP_OK) return false;
-    bool ok = (nvs_set_u8(h, _key_nfc_enabled, enabled ? 1 : 0) == ESP_OK)
-              && (nvs_commit(h) == ESP_OK);
+    const bool ok = (nvs_set_u8(h, _key_nfc_enabled, enabled ? 1 : 0) == ESP_OK)
+                    && (nvs_commit(h) == ESP_OK);
     nvs_close(h);
     return ok;
 }

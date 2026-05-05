@@ -71,7 +71,7 @@ bool extract_str(const ArduinoJson::JsonObjectConst& args, const char* cmd,
 
 // Clamp with warn log. Numeric values are clamped (Q1=c hybrid: numbers
 // clamp, strings/enums reject).
-int clamp_int(const char* cmd, const char* key, int v, int min, int max)
+int clamp_int(const char* cmd, const char* key, const int v, const int min, const int max)
 {
     if (v < min) {
         mclog::tagWarn(_tag, "{} '{}' clamped: {} -> {} (min)", cmd, key, v, min);
@@ -97,7 +97,7 @@ void CmdDispatcher::registerHandler(const std::string& cmd_name, Handler h)
     _handlers[cmd_name] = std::move(h);
 }
 
-void CmdDispatcher::dispatch(const NfcCmdEvent_t& ev)
+void CmdDispatcher::dispatch(const NfcCmdEvent_t& ev) const
 {
     ArduinoJson::JsonDocument doc;
     auto err = ArduinoJson::deserializeJson(doc, ev.payload.data(), ev.payload.size());
@@ -111,7 +111,7 @@ void CmdDispatcher::dispatch(const NfcCmdEvent_t& ev)
         mclog::tagWarn(_tag, "missing/invalid 'v' field uid={}", ev.uid);
         return;
     }
-    int v = doc["v"].as<int>();
+    const int v = doc["v"].as<int>();
     if (v != _SUPPORTED_VERSION) {
         mclog::tagWarn(_tag, "unsupported version {} (expected {}) uid={}",
                        v, _SUPPORTED_VERSION, ev.uid);
@@ -122,7 +122,7 @@ void CmdDispatcher::dispatch(const NfcCmdEvent_t& ev)
         mclog::tagWarn(_tag, "missing/invalid 'cmd' field uid={}", ev.uid);
         return;
     }
-    std::string cmd = doc["cmd"].as<const char*>();
+    const std::string cmd = doc["cmd"].as<const char*>();
 
     auto it = _handlers.find(cmd);
     if (it == _handlers.end()) {
@@ -245,7 +245,7 @@ void CmdDispatcher::initOnce()
             return;
         }
         mclog::tagInfo(_tag, "dance style={}", style);
-        bool ok = stackchan::actions::dance(style);
+        const bool ok = stackchan::actions::dance(style);
         char buf[96];
         std::snprintf(buf, sizeof(buf),
                       ok ? "%% NFC.dance(style=%s)" : "%% NFC.dance(unknown style=%s)",
@@ -253,7 +253,7 @@ void CmdDispatcher::initOnce()
         stackchan::avatar::pop_avatar_toast(buf, view::ToastType::Info, _TOAST_MS);
     });
     d.registerHandler("stop_dance", [](const ArduinoJson::JsonObjectConst& args) {
-        bool stopped = stackchan::actions::stop_dance();
+        const bool stopped = stackchan::actions::stop_dance();
         mclog::tagInfo(_tag, "stop_dance stopped={}", stopped);
         stackchan::avatar::pop_avatar_toast(
             stopped ? "% NFC.stop_dance(stopped)" : "% NFC.stop_dance(no dance)",

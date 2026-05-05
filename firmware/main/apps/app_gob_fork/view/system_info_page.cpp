@@ -14,7 +14,7 @@ using namespace uitk::lvgl_cpp;
 
 namespace {
 
-const char* reset_reason_str(esp_reset_reason_t r)
+const char* reset_reason_str(const esp_reset_reason_t r)
 {
     switch (r) {
         case ESP_RST_POWERON:    return "Power on";
@@ -37,16 +37,16 @@ const char* reset_reason_str(esp_reset_reason_t r)
     }
 }
 
-std::string format_uptime(uint32_t millis)
+std::string format_uptime(const uint32_t millis)
 {
-    uint32_t s = millis / 1000;
-    uint32_t h = s / 3600;
-    uint32_t m = (s % 3600) / 60;
-    uint32_t sec = s % 60;
+    const uint32_t s = millis / 1000;
+    const uint32_t h = s / 3600;
+    const uint32_t m = (s % 3600) / 60;
+    const uint32_t sec = s % 60;
     return fmt::format("{:02}:{:02}:{:02}", h, m, sec);
 }
 
-std::string format_kb_pair(size_t free_b, size_t total_b)
+std::string format_kb_pair(const size_t free_b, const size_t total_b)
 {
     return fmt::format("{} / {} KB", free_b / 1024, total_b / 1024);
 }
@@ -78,10 +78,10 @@ void SystemInfoPage::build_ui()
     _header_label->align(LV_ALIGN_TOP_LEFT, 12, 30);
 
     // Snapshot system metrics.
-    size_t heap_free  = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-    size_t heap_total = heap_caps_get_total_size(MALLOC_CAP_INTERNAL);
-    size_t psram_free  = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
-    size_t psram_total = heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
+    const size_t heap_free  = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+    const size_t heap_total = heap_caps_get_total_size(MALLOC_CAP_INTERNAL);
+    const size_t psram_free  = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+    const size_t psram_total = heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
 
     uint32_t cpu_hz = 0;
     esp_clk_tree_src_get_freq_hz(SOC_MOD_CLK_CPU, ESP_CLK_TREE_SRC_FREQ_PRECISION_APPROX, &cpu_hz);
@@ -89,7 +89,7 @@ void SystemInfoPage::build_ui()
     esp_chip_info_t chip = {};
     esp_chip_info(&chip);
 
-    std::string labels =
+    const std::string labels =
         "Heap free:\n"
         "PSRAM free:\n"
         "Battery:\n"
@@ -98,7 +98,7 @@ void SystemInfoPage::build_ui()
         "Chip:\n"
         "Reset:\n"
         "IDF:";
-    std::string values = fmt::format(
+    const std::string values = fmt::format(
         "{}\n"
         "{:.1f} / {:.1f} MB\n"
         "{}% ({})\n"

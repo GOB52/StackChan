@@ -234,7 +234,7 @@ void SkinBrowserPage::update()
 
 void SkinBrowserPage::perform_load_current()
 {
-    int64_t t0 = esp_timer_get_time();
+    const int64_t t0 = esp_timer_get_time();
     _load_failed = false;
     _load_err.clear();
 
@@ -255,7 +255,7 @@ void SkinBrowserPage::perform_load_current()
     release_cfg();
 
     const std::string& id = _skins[_index].id;
-    std::string skin_dir  = "/sdcard/" + id;
+    const std::string skin_dir  = "/sdcard/" + id;
     {
         stackchan::hal::SdGuard guard;
         // GOB fork: caller (AppGobFork::enter_skin_browser) で page lifecycle
@@ -318,7 +318,7 @@ void SkinBrowserPage::perform_load_current()
 
     update_info_labels();
 
-    int64_t elapsed_ms = (esp_timer_get_time() - t0) / 1000;
+    const int64_t elapsed_ms = (esp_timer_get_time() - t0) / 1000;
     mclog::tagInfo(_tag, "loaded '{}' ({} ms)", id, static_cast<int>(elapsed_ms));
 }
 
@@ -375,7 +375,7 @@ void SkinBrowserPage::show_loading(bool loading)
             _loading_overlay->addFlag(LV_OBJ_FLAG_HIDDEN);
         }
     }
-    auto set_disabled = [&](Button* b, bool dis) {
+    auto set_disabled = [&](Button* b, const bool dis) {
         if (!b) return;
         if (dis) lv_obj_add_state(b->raw_ptr(), LV_STATE_DISABLED);
         else     lv_obj_remove_state(b->raw_ptr(), LV_STATE_DISABLED);
@@ -396,9 +396,9 @@ void SkinBrowserPage::confirm_apply()
                         PendingAction::Apply);
 }
 
-void SkinBrowserPage::show_confirm_dialog(const char* title,
+void SkinBrowserPage::show_confirm_dialog(const char* const title,
                                           const std::string& body,
-                                          PendingAction on_yes)
+                                          const PendingAction on_yes)
 {
     close_dialog();
 

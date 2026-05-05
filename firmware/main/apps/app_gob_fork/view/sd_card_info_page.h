@@ -32,7 +32,7 @@ private:
     };
 
     void build_ui();
-    InfoSnapshot collect_info();
+    InfoSnapshot collect_info() const;
 
     OnBack _on_back;
     bool   _back_pending = false;

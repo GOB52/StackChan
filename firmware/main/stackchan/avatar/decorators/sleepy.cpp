@@ -27,7 +27,7 @@ SleepyDecorator::SleepyDecorator(lv_obj_t* parent, uint32_t destroyAfterMs, uint
     _y_offset = 0;
     _opa      = LV_OPA_COVER;
 
-    uint32_t now = GetHAL().millis();
+    const uint32_t now = GetHAL().millis();
     if (destroyAfterMs > 0) {
         _destroy_at   = now + destroyAfterMs;
         _has_lifetime = true;
@@ -41,7 +41,7 @@ SleepyDecorator::~SleepyDecorator() = default;
 
 void SleepyDecorator::_update()
 {
-    uint32_t now = GetHAL().millis();
+    const uint32_t now = GetHAL().millis();
 
     if (_has_lifetime && now >= _destroy_at) {
         requestDestroy();
@@ -64,7 +64,7 @@ void SleepyDecorator::_update()
     _zzz->setOpa(static_cast<lv_opa_t>(_opa));
 }
 
-void SleepyDecorator::setPosition(int x, int y)
+void SleepyDecorator::setPosition(const int x, const int y)
 {
     _base_x = x;
     _base_y = y;
@@ -73,7 +73,7 @@ void SleepyDecorator::setPosition(int x, int y)
     }
 }
 
-void SleepyDecorator::setColor(lv_color_t color)
+void SleepyDecorator::setColor(const lv_color_t color)
 {
     if (_zzz) {
         _zzz->setImageRecolorOpa(LV_OPA_COVER);
@@ -81,7 +81,7 @@ void SleepyDecorator::setColor(lv_color_t color)
     }
 }
 
-void SleepyDecorator::setVisible(bool visible)
+void SleepyDecorator::setVisible(const bool visible)
 {
     Element::setVisible(visible);
     if (_zzz) {

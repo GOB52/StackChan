@@ -66,7 +66,7 @@ void pop_avatar_toast(std::string_view msg, ::view::ToastType type, uint32_t dur
         td->stack();
     }
 
-    ::view::Toast::Config_t cfg{type, durationMs, std::string(msg)};
+    const ::view::Toast::Config_t cfg{type, durationMs, std::string(msg)};
     sc.avatar().addDecorator(
         std::make_unique<ToastDecorator>(lv_screen_active(), cfg));
 }

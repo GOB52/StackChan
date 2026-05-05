@@ -47,7 +47,7 @@ SdCardInfoPage::SdCardInfoPage(OnBack on_back) : _on_back(std::move(on_back))
 
 SdCardInfoPage::~SdCardInfoPage() = default;
 
-SdCardInfoPage::InfoSnapshot SdCardInfoPage::collect_info()
+SdCardInfoPage::InfoSnapshot SdCardInfoPage::collect_info() const
 {
     InfoSnapshot snap;
 
@@ -150,7 +150,7 @@ void SdCardInfoPage::build_ui()
         anchor = _skin_list_label->raw_ptr();
     } else {
         // 2-column for Mount/Total/Free.
-        std::string labels = "Mount:\nTotal:\nFree:";
+        const std::string labels = "Mount:\nTotal:\nFree:";
         std::string values;
         if (snap.stat_ok) {
             double total_mb = snap.total_b / (1024.0 * 1024.0);

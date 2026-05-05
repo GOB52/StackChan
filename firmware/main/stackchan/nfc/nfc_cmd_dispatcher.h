@@ -27,7 +27,7 @@ public:
 
     // Parse + validate + route. Errors at any stage are logged at warn level
     // and the call returns silently (no abort, no exception).
-    void dispatch(const NfcCmdEvent_t& ev);
+    void dispatch(const NfcCmdEvent_t& ev) const;
 
     // Bind dispatch() to GetHAL().onNfcCmdReceived. Idempotent.
     void connectToHal();

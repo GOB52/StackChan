@@ -48,7 +48,7 @@ void cancel_in_flight_dance_locked()
 }
 }  // namespace
 
-void head_home(int speed)
+void head_home(const int speed)
 {
     mclog::tagInfo(_tag, "head_home speed={}", speed);
     LvglLockGuard lock;
@@ -59,7 +59,7 @@ void head_home(int speed)
 
 bool dance(const std::string& style)
 {
-    auto* seq = lookup_dance_sequence(style);
+    const auto* seq = lookup_dance_sequence(style);
     if (!seq) {
         mclog::tagWarn(_tag, "dance: unknown style '{}'", style);
         return false;
@@ -67,7 +67,7 @@ bool dance(const std::string& style)
     mclog::tagInfo(_tag, "dance style={}", style);
     LvglLockGuard lock;
     cancel_in_flight_dance_locked();
-    int id = GetStackChan().addModifier(std::make_unique<DanceModifier>(*seq));
+    const int id = GetStackChan().addModifier(std::make_unique<DanceModifier>(*seq));
     _dance_modifier_id.store(id);
     return true;
 }
@@ -75,13 +75,13 @@ bool dance(const std::string& style)
 bool stop_dance()
 {
     LvglLockGuard lock;
-    int id = _dance_modifier_id.exchange(-1);
+    const int id = _dance_modifier_id.exchange(-1);
     if (id < 0) return false;
     auto& sc = GetStackChan();
     Modifier* m = sc.getModifier(id);
     if (!m) return false;
     if (!dynamic_cast<DanceModifier*>(m)) return false;
-    bool ok = sc.removeModifier(id);
+    const bool ok = sc.removeModifier(id);
     if (ok) mclog::tagInfo(_tag, "stop_dance: stopped id={}", id);
     return ok;
 }

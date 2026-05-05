@@ -19,7 +19,7 @@ void build_dsc_from_png(lv_image_dsc_t& dsc, const PngBuffer& src)
 }  // namespace
 
 lv_draw_buf_t* make_skin_thumbnail(const ImageAvatarConfig& cfg,
-                                   int scale_div,
+                                   const int scale_div,
                                    lv_obj_t* parent_layer,
                                    std::string& err)
 {

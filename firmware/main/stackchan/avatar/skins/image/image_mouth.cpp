@@ -41,11 +41,11 @@ ImageMouth::ImageMouth(lv_obj_t* parent, const MouthAsset& asset)
 
 ImageMouth::~ImageMouth() = default;
 
-void ImageMouth::setWeight(int weight)
+void ImageMouth::setWeight(const int weight)
 {
     Feature::setWeight(weight);
 
-    bool want_open = (_weight >= OPEN_THRESHOLD);
+    const bool want_open = (_weight >= OPEN_THRESHOLD);
     if (want_open == _is_open) {
         return;
     }
@@ -66,7 +66,7 @@ void ImageMouth::setWeight(int weight)
     }
 }
 
-void ImageMouth::setVisible(bool visible)
+void ImageMouth::setVisible(const bool visible)
 {
     Element::setVisible(visible);
     _img->setHidden(!visible);

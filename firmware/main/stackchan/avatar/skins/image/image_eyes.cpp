@@ -40,11 +40,11 @@ ImageEyes::ImageEyes(lv_obj_t* parent, const EyeAsset& asset)
 
 ImageEyes::~ImageEyes() = default;
 
-void ImageEyes::setWeight(int weight)
+void ImageEyes::setWeight(const int weight)
 {
     Feature::setWeight(weight);
 
-    bool want_open = (_weight >= OPEN_THRESHOLD);
+    const bool want_open = (_weight >= OPEN_THRESHOLD);
     if (want_open == _is_open) {
         return;
     }
@@ -52,7 +52,7 @@ void ImageEyes::setWeight(int weight)
     _img->setSrc(want_open ? &_dsc_open : &_dsc_closed);
 }
 
-void ImageEyes::setVisible(bool visible)
+void ImageEyes::setVisible(const bool visible)
 {
     Element::setVisible(visible);
     _img->setHidden(!visible);
@@ -63,7 +63,7 @@ void ImageEyes::setPosition(const Vector2i& position)
     Element::setPosition(position);
 
     // Microscopic gaze offset (-100..100 -> -4..4 px) so eyebrow/forehead don't shift
-    int dx = (_position.x * 4) / 100;
-    int dy = (_position.y * 4) / 100;
+    const int dx = (_position.x * 4) / 100;
+    const int dy = (_position.y * 4) / 100;
     _img->setPos(_x + dx, _y + dy);
 }

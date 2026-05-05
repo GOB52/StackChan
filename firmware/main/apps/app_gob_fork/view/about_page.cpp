@@ -28,8 +28,8 @@ std::string format_build_datetime()
             break;
         }
     }
-    int day  = std::atoi(&__DATE__[4]);  // "MMM DD YYYY" → day at offset 4-5
-    int year = std::atoi(&__DATE__[7]);  // year at offset 7-10
+    const int day  = std::atoi(&__DATE__[4]);  // "MMM DD YYYY" → day at offset 4-5
+    const int year = std::atoi(&__DATE__[7]);  // year at offset 7-10
     return fmt::format("{:04}/{:02}/{:02} {}", year, month, day, __TIME__);
 }
 
@@ -95,8 +95,8 @@ void AboutPage::build_ui()
     };
 
     // Top block: Firmware / GOB Fork / Build (multi-line per column).
-    std::string top_labels = "Firmware:\nGOB Fork:\nBuild:";
-    std::string top_values = fmt::format(
+    const std::string top_labels = "Firmware:\nGOB Fork:\nBuild:";
+    const std::string top_values = fmt::format(
         "V{}\n{}\n{}",
         FIRMWARE_VERSION,
         GOB_FORK_GIT_HASH,

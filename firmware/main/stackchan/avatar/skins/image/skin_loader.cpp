@@ -26,7 +26,7 @@ static bool read_text_file(const std::string& path, std::string& out, std::strin
         return false;
     }
     fseek(f, 0, SEEK_END);
-    long sz = ftell(f);
+    const long sz = ftell(f);
     fseek(f, 0, SEEK_SET);
     if (sz <= 0 || sz > 64 * 1024) {
         err = fmt::format("text file size invalid ({}): {}", sz, path);
@@ -52,7 +52,7 @@ static bool read_png_file(const std::string& path, PngBuffer& out, std::string& 
         return false;
     }
     fseek(f, 0, SEEK_END);
-    long sz = ftell(f);
+    const long sz = ftell(f);
     fseek(f, 0, SEEK_SET);
     if (sz <= 0 || sz > 1024 * 1024) {
         err = fmt::format("png size invalid ({}): {}", sz, path);
@@ -102,7 +102,7 @@ static const std::unordered_map<std::string, EmotionDecoratorKind> _kind_map = {
 
 static bool parse_emotion(const std::string& s, Emotion& out)
 {
-    auto it = _emotion_map.find(s);
+    const auto it = _emotion_map.find(s);
     if (it == _emotion_map.end()) return false;
     out = it->second;
     return true;
@@ -110,7 +110,7 @@ static bool parse_emotion(const std::string& s, Emotion& out)
 
 static bool parse_decorator_kind(const std::string& s, EmotionDecoratorKind& out)
 {
-    auto it = _kind_map.find(s);
+    const auto it = _kind_map.find(s);
     if (it == _kind_map.end()) return false;
     out = it->second;
     return true;
@@ -163,7 +163,7 @@ bool load_avatar_index(AvatarIndex& out, std::string& err)
 // into PSRAM (filling out.{base,eye_left,eye_right,mouth} PngBuffers).
 bool load_image_avatar_config(const std::string& skin_dir, ImageAvatarConfig& out, std::string& err)
 {
-    std::string manifest_path = skin_dir + "/manifest.json";
+    const std::string manifest_path = skin_dir + "/manifest.json";
     mclog::tagInfo(_tag, "Reading {}", manifest_path);
     std::string text;
     if (!read_text_file(manifest_path, text, err)) return false;
@@ -238,8 +238,8 @@ bool load_image_avatar_config(const std::string& skin_dir, ImageAvatarConfig& ou
     if (!deco_array.isNull()) {
         for (auto v : deco_array) {
             EmotionDecoratorMapping mapping;
-            std::string emo_str  = v["emotion"].as<std::string>();
-            std::string kind_str = v["kind"].as<std::string>();
+            const std::string emo_str  = v["emotion"].as<std::string>();
+            const std::string kind_str = v["kind"].as<std::string>();
             if (!parse_emotion(emo_str, mapping.emotion)) {
                 err = fmt::format("{}: unknown emotion '{}'", manifest_path, emo_str);
                 return false;
@@ -249,8 +249,8 @@ bool load_image_avatar_config(const std::string& skin_dir, ImageAvatarConfig& ou
                 return false;
             }
             mapping.animation_interval_ms = v["anim_ms"] | 500u;
-            bool has_x = !v["x"].isNull();
-            bool has_y = !v["y"].isNull();
+            const bool has_x = !v["x"].isNull();
+            const bool has_y = !v["y"].isNull();
             if (has_x && has_y) {
                 mapping.has_custom_position = true;
                 mapping.x = v["x"] | 0;
@@ -359,7 +359,7 @@ static SkinLoadResult make_default_fallback(lv_obj_t* parent, const std::string&
 
 SkinLoadResult load_avatar_or_fallback(lv_obj_t* parent)
 {
-    int64_t t_start = esp_timer_get_time();
+    const int64_t t_start = esp_timer_get_time();
 
     // Forced DefaultAvatar (set via NVS = "__default__"). Skip SD entirely.
     {
@@ -418,7 +418,7 @@ SkinLoadResult load_avatar_or_fallback(lv_obj_t* parent)
         }
 
         // 6. /sdcard/<skin_id>/manifest.json + PNGs
-        std::string skin_dir = "/sdcard/" + skin_id;
+        const std::string skin_dir = "/sdcard/" + skin_id;
         mclog::tagInfo(_tag, "Loading skin '{}' from {}", skin_id, skin_dir);
         if (!load_image_avatar_config(skin_dir, cfg, err)) {
             mclog::tagError(_tag, "skin '{}' load failed: {}", skin_id, err);
@@ -428,7 +428,7 @@ SkinLoadResult load_avatar_or_fallback(lv_obj_t* parent)
     // SdGuard dtor: GPIO35 → LCD_DC, LVGL lock released
 
     // Compute total PSRAM-resident PNG bytes for diagnostics.
-    size_t total_bytes = cfg.base.size +
+    const size_t total_bytes = cfg.base.size +
                          cfg.eye_left.open.size + cfg.eye_left.closed.size +
                          cfg.eye_right.open.size + cfg.eye_right.closed.size +
                          cfg.mouth.normal.size + cfg.mouth.open.size;
@@ -441,7 +441,7 @@ SkinLoadResult load_avatar_or_fallback(lv_obj_t* parent)
     SkinLoadResult result;
     result.avatar         = std::move(img);
     result.loaded_skin_id = skin_id;
-    int64_t elapsed_ms = (esp_timer_get_time() - t_start) / 1000;
+    const int64_t elapsed_ms = (esp_timer_get_time() - t_start) / 1000;
     mclog::tagInfo(_tag, "Loaded skin '{}' ({} bytes total, {} ms)",
                    skin_id, total_bytes, static_cast<int>(elapsed_ms));
     return result;

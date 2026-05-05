@@ -23,7 +23,7 @@ DoubtDecorator::DoubtDecorator(lv_obj_t* parent, uint32_t destroyAfterMs, uint32
     _question->setTransformPivot(_question->getWidth() / 2, _question->getHeight() / 2);
     _question->setRotation(_doubt_rotation_frames[0]);
 
-    uint32_t now = GetHAL().millis();
+    const uint32_t now = GetHAL().millis();
     if (destroyAfterMs > 0) {
         _destroy_at   = now + destroyAfterMs;
         _has_lifetime = true;
@@ -37,7 +37,7 @@ DoubtDecorator::~DoubtDecorator() = default;
 
 void DoubtDecorator::_update()
 {
-    uint32_t now = GetHAL().millis();
+    const uint32_t now = GetHAL().millis();
 
     if (_has_lifetime && now >= _destroy_at) {
         requestDestroy();
@@ -51,21 +51,21 @@ void DoubtDecorator::_update()
     }
 }
 
-void DoubtDecorator::setPosition(int x, int y)
+void DoubtDecorator::setPosition(const int x, const int y)
 {
     if (_question) {
         _question->setPos(x, y);
     }
 }
 
-void DoubtDecorator::setRotation(int rotation)
+void DoubtDecorator::setRotation(const int rotation)
 {
     if (_question) {
         _question->setRotation(rotation);
     }
 }
 
-void DoubtDecorator::setColor(lv_color_t color)
+void DoubtDecorator::setColor(const lv_color_t color)
 {
     if (_question) {
         _question->setImageRecolorOpa(LV_OPA_COVER);
@@ -73,7 +73,7 @@ void DoubtDecorator::setColor(lv_color_t color)
     }
 }
 
-void DoubtDecorator::setVisible(bool visible)
+void DoubtDecorator::setVisible(const bool visible)
 {
     Element::setVisible(visible);
     if (_question) {

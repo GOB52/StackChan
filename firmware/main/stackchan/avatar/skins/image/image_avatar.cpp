@@ -69,7 +69,7 @@ Container* ImageAvatar::getPanel() const
     return _panel ? _panel.get() : nullptr;
 }
 
-void ImageAvatar::setEmotion(const Emotion& emotion, bool suppressDecorator)
+void ImageAvatar::setEmotion(const Emotion& emotion, const bool suppressDecorator)
 {
     Avatar::setEmotion(emotion, suppressDecorator);
 
@@ -97,13 +97,13 @@ void ImageAvatar::setEmotion(const Emotion& emotion, bool suppressDecorator)
         return;
     }
 
-    auto it = std::find_if(_config.emotion_decorators.begin(), _config.emotion_decorators.end(),
+    const auto it = std::find_if(_config.emotion_decorators.begin(), _config.emotion_decorators.end(),
                            [&](const EmotionDecoratorMapping& m) { return m.emotion == emotion; });
     if (it == _config.emotion_decorators.end() || it->kind == EmotionDecoratorKind::None) {
         return;
     }
 
-    auto* deco_parent = lv_screen_active();
+    auto* const deco_parent = lv_screen_active();
     std::unique_ptr<Decorator> deco;
     switch (it->kind) {
         case EmotionDecoratorKind::Heart: {

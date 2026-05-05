@@ -62,12 +62,12 @@ bool mount_sd()
     mcfg.max_files                        = 4;
     mcfg.allocation_unit_size             = 16 * 1024;
 
-    esp_err_t e = esp_vfs_fat_sdspi_mount("/sdcard", &host, &slot, &mcfg, &_card);
+    const esp_err_t e = esp_vfs_fat_sdspi_mount("/sdcard", &host, &slot, &mcfg, &_card);
     if (e != ESP_OK) {
         mclog::tagError(_tag, "esp_vfs_fat_sdspi_mount failed: 0x{:x}", static_cast<int>(e));
         return false;
     }
-    uint64_t bytes = static_cast<uint64_t>(_card->csd.capacity) * _card->csd.sector_size;
+    const uint64_t bytes = static_cast<uint64_t>(_card->csd.capacity) * _card->csd.sector_size;
     mclog::tagInfo(_tag, "mounted /sdcard ({} MB)", static_cast<uint32_t>(bytes >> 20));
     return true;
 }
@@ -104,7 +104,7 @@ bool SdGuard::unmount()
     if (!_mounted) {
         return true;
     }
-    esp_err_t e = esp_vfs_fat_sdcard_unmount("/sdcard", _card);
+    const esp_err_t e = esp_vfs_fat_sdcard_unmount("/sdcard", _card);
     if (e != ESP_OK) {
         mclog::tagWarn(_tag, "esp_vfs_fat_sdcard_unmount failed: 0x{:x}", static_cast<int>(e));
         return false;
@@ -130,7 +130,7 @@ bool SdGuard::isActive()
     return _guard_active.load() || _extra_touch_skip.load();
 }
 
-void SdGuard::setExtraTouchSkip(bool skip)
+void SdGuard::setExtraTouchSkip(const bool skip)
 {
     _extra_touch_skip.store(skip);
 }
