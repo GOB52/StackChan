@@ -398,7 +398,7 @@ API は `firmware/main/stackchan/gob_fork_nvs.h` を参照。
 
 ## 8. リファレンス / 出典
 
-- **[mongonta0716/M5Core2ImageAvatarLite](https://github.com/mongonta0716/M5Core2ImageAvatarLite)** — `tmp/takao_pack/` の girl / jacko / phi / puipui / robot / slime 6 skin (顔パーツ画像) の出典。Takao Akaki (mongonta555) 氏が公開している M5Stack 用 ImageAvatar ライブラリで、本 fork はそのアセットを ESP-IDF + LVGL 上で描画する仕組みに変換して使用している
+- **[mongonta0716/M5Core2ImageAvatarLite](https://github.com/mongonta0716/M5Core2ImageAvatarLite)** — `takao_pack.zip` 同梱の girl / jacko / phi / puipui / robot / slime 6 skin (顔パーツ画像) の出典。Takao Akaki (mongonta555) 氏が公開している M5Stack 用 ImageAvatar ライブラリで、本 fork はそのアセットを ESP-IDF + LVGL 上で描画する仕組みに変換して使用している
 - LVGL: [https://lvgl.io/](https://lvgl.io/) (PNG decode + image cache)
 - PNG 仕様: [PNG (Portable Network Graphics) Specification](https://www.w3.org/TR/png/)
 
@@ -802,6 +802,6 @@ Backward compatibility: existing manifests keep working as long as they do not c
 
 ## 8. References / Credits
 
-- **[mongonta0716/M5Core2ImageAvatarLite](https://github.com/mongonta0716/M5Core2ImageAvatarLite)** — Source of the face-part PNGs for the 6 skins (girl / jacko / phi / puipui / robot / slime) in `tmp/takao_pack/`. Original ImageAvatar library for M5Stack by Takao Akaki (mongonta555); this fork converts those assets into a manifest-driven format renderable under ESP-IDF + LVGL.
+- **[mongonta0716/M5Core2ImageAvatarLite](https://github.com/mongonta0716/M5Core2ImageAvatarLite)** — Source of the face-part PNGs for the 6 skins (girl / jacko / phi / puipui / robot / slime) bundled in `takao_pack.zip`. Original ImageAvatar library for M5Stack by Takao Akaki (mongonta555); this fork converts those assets into a manifest-driven format renderable under ESP-IDF + LVGL.
 - LVGL: [https://lvgl.io/](https://lvgl.io/) (PNG decode + image cache)
 - PNG spec: [PNG (Portable Network Graphics) Specification](https://www.w3.org/TR/png/)
