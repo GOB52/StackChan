@@ -26,9 +26,9 @@
 static const std::string_view _tag = "HAL-NFC";
 
 namespace {
-std::unique_ptr<m5::unit::UnitUnified>     _units;
-std::unique_ptr<m5::unit::UnitNFC>         _unit_nfc;
-std::unique_ptr<m5::nfc::NFCLayerA>        _nfc_a;
+std::unique_ptr<m5::unit::UnitUnified> _units;
+std::unique_ptr<m5::unit::UnitNFC> _unit_nfc;
+std::unique_ptr<m5::nfc::NFCLayerA> _nfc_a;
 
 constexpr const char* _STACKCHAN_CMD_MIME = "application/vnd.stackchan.cmd+json";
 
@@ -38,15 +38,36 @@ constexpr const char* _STACKCHAN_CMD_MIME = "application/vnd.stackchan.cmd+json"
 // (core 1). Atomic so cross-core load/store is well defined.
 std::atomic<bool> _nfc_busy{false};
 
+// reactivate retry — 失敗時に最大 max_retry 回追加試行する。RF/I2C 一過性
+// エラーで NDEF read を諦めずに済む。speaking 中は recover 実績ゼロ (実機ログで
+// 確認済み) なので retry せず即次 cycle へ抜ける。retry 浪費が cycle 数を激減
+// (5秒に1cycle 等) させる主因なので排除。
+bool reactivate_with_retry(m5::nfc::a::PICC& u)
+{
+    const int max_retry = hal_bridge::is_xiaozhi_speaking() ? 0 : 3;
+    for (int i = 0; i <= max_retry; i++) {
+        if (_nfc_a->reactivate(u)) {
+            if (i > 0) {
+                mclog::tagInfo(_tag, "reactivate recovered on retry {}/{}", i, max_retry);
+            }
+            return true;
+        }
+        if (i < max_retry) {
+            mclog::tagWarn(_tag, "reactivate failed, retry {}/{} (speaking={})", i + 1, max_retry,
+                           hal_bridge::is_xiaozhi_speaking());
+        }
+    }
+    return false;
+}
+
 // NDEF read transient miss を救う。失敗時に deactivate → reactivate →
 // ndefRead を最大 MAX_RETRY 回追加試行。RF flux 弱 / I2C 競合 / tag 動き等で
 // 1 度の read miss が発生しても、次の cycle を待たずに recover できる。
 // 失敗時の追加コスト: 1 retry あたり ~70ms (deactivate + reactivate + ndefRead)。
 //
-// 例外: TTS 発声中は retry を行わない (1 回のみ試行)。スピーカー電源負荷 +
-// EMI で NFC RF が劣化し 20ms 程度の retry 間隔では tag が応答を回復しない。
-// retry が AFE feed task を ~250ms starve させて Ringbuffer full を引き起こす
-// が、発声中は救えないので副作用のみ。非発声時は MAX_RETRY=2 で recover を狙う。
+// 例外: TTS 発声中は retry を 1 回に絞る。speaking 中も recover 実績あり
+// (NDEF read miss → 1 retry で成功した実例)、ただし 2 回以上は浪費が大きい
+// ため打ち切る。
 bool read_ndef_with_retry(m5::nfc::a::PICC& u, std::vector<m5::nfc::ndef::TLV>& tlvs)
 {
     const int max_retry = hal_bridge::is_xiaozhi_speaking() ? 1 : 3;
@@ -58,10 +79,11 @@ bool read_ndef_with_retry(m5::nfc::a::PICC& u, std::vector<m5::nfc::ndef::TLV>& 
             return true;
         }
         if (i < max_retry) {
-            mclog::tagWarn(_tag, "NDEF read miss, retry {}/{}", i + 1, max_retry);
+            mclog::tagWarn(_tag, "NDEF read miss, retry {}/{} (speaking={})", i + 1, max_retry,
+                           hal_bridge::is_xiaozhi_speaking());
             _nfc_a->deactivate();
-            //vTaskDelay(pdMS_TO_TICKS(20));  // tag RF 安定化待ち
-            if (!_nfc_a->reactivate(u)) {
+            // vTaskDelay(pdMS_TO_TICKS(20));  // tag RF 安定化待ち
+            if (!reactivate_with_retry(u)) {
                 mclog::tagWarn(_tag, "reactivate failed during NDEF read retry");
                 return false;
             }
@@ -72,22 +94,20 @@ bool read_ndef_with_retry(m5::nfc::a::PICC& u, std::vector<m5::nfc::ndef::TLV>& 
 
 // TLV/record loop を集約。stackchan:cmd MIME record を cmd_events に追加。
 // 各 skip 経路には警告ログを残し、シリアルで原因が追えるようにする。
-void parse_tlvs_and_collect(const std::vector<m5::nfc::ndef::TLV>& tlvs,
-                            const std::string& uid,
+void parse_tlvs_and_collect(const std::vector<m5::nfc::ndef::TLV>& tlvs, const std::string& uid,
                             std::vector<NfcCmdEvent_t>& cmd_events)
 {
     size_t msg_tlvs = 0, total_records = 0, match_count = 0;
     for (const auto& tlv : tlvs) {
         if (!tlv.isMessageTLV()) {
-            mclog::tagInfo(_tag, "skip non-Message TLV (tag={})",
-                           static_cast<int>(tlv.tag()));
+            mclog::tagInfo(_tag, "skip non-Message TLV (tag={})", static_cast<int>(tlv.tag()));
             continue;
         }
         msg_tlvs++;
         for (const auto& rec : tlv.records()) {
             total_records++;
             const std::string rec_type(rec.type());
-            const int         tnf_val = static_cast<int>(rec.tnf());
+            const int tnf_val = static_cast<int>(rec.tnf());
             if (rec.tnf() != m5::nfc::ndef::TNF::MIMEMedia) {
                 mclog::tagWarn(_tag,
                                "record skipped: TNF={} (need MIME=2) "
@@ -102,12 +122,8 @@ void parse_tlvs_and_collect(const std::vector<m5::nfc::ndef::TLV>& tlvs,
                                rec_type, _STACKCHAN_CMD_MIME, rec.payloadSize());
                 continue;
             }
-            NfcCmdEvent_t cev{
-                uid,
-                std::vector<uint8_t>(rec.payload(),
-                                     rec.payload() + rec.payloadSize())};
-            mclog::tagInfo(_tag, "stackchan:cmd received uid={} bytes={}",
-                           cev.uid, cev.payload.size());
+            NfcCmdEvent_t cev{uid, std::vector<uint8_t>(rec.payload(), rec.payload() + rec.payloadSize())};
+            mclog::tagInfo(_tag, "stackchan:cmd received uid={} bytes={}", cev.uid, cev.payload.size());
             cmd_events.push_back(std::move(cev));
             match_count++;
         }
@@ -122,12 +138,11 @@ void parse_tlvs_and_collect(const std::vector<m5::nfc::ndef::TLV>& tlvs,
 
 // 1 PICC 単位の処理: identify → emit tag (pending) → reactivate → NDEF read →
 // parse して cmd_events (pending) に追加。途中失敗は warn ログ + early return。
-void process_picc(m5::nfc::a::PICC& u,
-                  std::vector<NfcTagEvent_t>& tag_events,
-                  std::vector<NfcCmdEvent_t>& cmd_events)
+void process_picc(m5::nfc::a::PICC& u, std::vector<NfcTagEvent_t>& tag_events, std::vector<NfcCmdEvent_t>& cmd_events)
 {
     if (!_nfc_a->identify(u)) {
-        mclog::tagWarn(_tag, "PICC identify failed uid={}", u.uidAsString());
+        mclog::tagWarn(_tag, "PICC identify failed uid={} (speaking={})", u.uidAsString(),
+                       hal_bridge::is_xiaozhi_speaking());
         return;
     }
     NfcTagEvent_t ev{u.uidAsString(), u.typeAsString()};
@@ -135,16 +150,14 @@ void process_picc(m5::nfc::a::PICC& u,
     tag_events.push_back(ev);
 
     // identify は成功時 PICC を halt するので reactivate が必須。
-    // 失敗 = tag 既に外された等、このサイクルでの NDEF read は諦める。
-    if (!_nfc_a->reactivate(u)) {
+    // retry 込みで失敗 = tag 既に外された等、このサイクルでの NDEF read は諦める。
+    if (!reactivate_with_retry(u)) {
         mclog::tagWarn(_tag, "reactivate failed after identify uid={}", ev.uid);
         return;
     }
 
     if (!u.supportsNDEF()) {
-        mclog::tagWarn(_tag,
-                       "NDEF skipped: PICC type '{}' does not support NDEF",
-                       ev.type);
+        mclog::tagWarn(_tag, "NDEF skipped: PICC type '{}' does not support NDEF", ev.type);
         return;
     }
 
@@ -162,15 +175,16 @@ void process_picc(m5::nfc::a::PICC& u,
 }
 
 // 1 cycle 分の poll: units->update → detect → 全 PICC 処理 → deactivate。
-// detect timeout は 50ms (default 1000ms から短縮)。1 秒待つと busy ratio が
-// 80%+ になり FT6336 touch poll が starve するため。
-void poll_once(std::vector<NfcTagEvent_t>& tag_events,
-               std::vector<NfcCmdEvent_t>& cmd_events)
+// detect timeout: speaking 中は 10ms (cycle 機会優先で速度勝負)、非 speaking
+// は 50ms (1 回の detect で確実に拾う)。default 1000ms から短縮しているのは
+// busy ratio を抑え FT6336 touch poll の starve を防ぐため。
+void poll_once(std::vector<NfcTagEvent_t>& tag_events, std::vector<NfcCmdEvent_t>& cmd_events)
 {
     _units->update();
 
     std::vector<m5::nfc::a::PICC> piccs;
-    if (!_nfc_a->detect(piccs, 50)) {
+    const int detect_timeout_ms = hal_bridge::is_xiaozhi_speaking() ? 10 : 50;
+    if (!_nfc_a->detect(piccs, detect_timeout_ms)) {
         return;
     }
     for (auto& u : piccs) {
@@ -188,8 +202,17 @@ bool Hal::isNfcBusy()
 
 static void _nfc_task(void* /*param*/)
 {
+    // // DEBUG (5sec 検証用、必要時にコメントアウトを解除): poll cycle 集計
+    // static uint32_t cycles_total    = 0;
+    // static uint32_t cycles_speaking = 0;
+    // static uint32_t last_log_ms     = 0;
+
     while (1) {
         if (_units && _unit_nfc && _nfc_a) {
+            // // DEBUG カウンタ更新
+            // if (hal_bridge::is_xiaozhi_speaking()) cycles_speaking++;
+            // cycles_total++;
+
             // emit を NFC busy 終了後に集約する。handler 内の重い処理
             // (LVGL toast / OGG demux 等) が busy 期間を伸ばさないように。
             // 安全性: handler は move/setColor/Toast/PlaySound いずれも I2C 非使用。
@@ -207,8 +230,18 @@ static void _nfc_task(void* /*param*/)
                 GetHAL().onNfcCmdReceived.emit(cev);
             }
         }
-        // detect timeout 50ms により busy 期間短縮、poll 周期 100ms。
-        vTaskDelay(pdMS_TO_TICKS(100));
+
+        // // DEBUG: 5sec ごとに poll cycle 集計をログ
+        // const uint32_t now_ms = pdTICKS_TO_MS(xTaskGetTickCount());
+        // if (now_ms - last_log_ms >= 5000) {
+        //     mclog::tagInfo(_tag, "poll cycles last 5s: total={} speaking={} ({}%)", cycles_total, cycles_speaking,
+        //                    cycles_total ? (cycles_speaking * 100 / cycles_total) : 0);
+        //     cycles_total    = 0;
+        //     cycles_speaking = 0;
+        //     last_log_ms     = now_ms;
+        // }
+
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
