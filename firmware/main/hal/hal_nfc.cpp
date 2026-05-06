@@ -1,17 +1,13 @@
 // StackChan firmware fork - new file by GOB (X:@GOB_52_GOB / GitHub:GOB52)
 //
-// Phase 1a — M5Unit-NFC integration via M5UnitUnified ESP-IDF native I2C.
-// Polls NFC-A PICCs on the existing I2C master bus shared with BMI270/RTC,
-// emits NfcTagEvent_t with UID + classified type.
-//
-// Phase 1b — Additionally read NDEF on identified tags and emit
-// NfcCmdEvent_t for each NDEF MIME record whose type is
+// M5Unit-NFC integration via M5UnitUnified ESP-IDF native I2C. Polls NFC-A
+// PICCs on the existing I2C master bus shared with BMI270/RTC, emits
+// NfcTagEvent_t with UID + classified type. For identified tags, additionally
+// reads NDEF and emits NfcCmdEvent_t for each NDEF MIME record whose type is
 // "application/vnd.stackchan.cmd+json" (RFC 6838 vendor tree).
-// JSON parsing and dispatch are deferred to Phase 1c.
 //
-// Refactor: poll task は phase 別の helper 関数に分割
+// Poll task is split into helper functions:
 //   poll_once -> process_picc -> read_ndef_with_retry / parse_tlvs_and_collect
-// 案 R (read miss retry): reactivate→ndefRead を最大 (1 + MAX_RETRY) 回試行。
 #include "hal.h"
 #include "board/hal_bridge.h"
 #include "../stackchan/gob_fork_nvs.h"
@@ -42,16 +38,15 @@ constexpr const char* _STACKCHAN_CMD_MIME = "application/vnd.stackchan.cmd+json"
 // (core 1). Atomic so cross-core load/store is well defined.
 std::atomic<bool> _nfc_busy{false};
 
-// 案 R: NDEF read transient miss を救う。失敗時に deactivate → reactivate →
+// NDEF read transient miss を救う。失敗時に deactivate → reactivate →
 // ndefRead を最大 MAX_RETRY 回追加試行。RF flux 弱 / I2C 競合 / tag 動き等で
 // 1 度の read miss が発生しても、次の cycle を待たずに recover できる。
 // 失敗時の追加コスト: 1 retry あたり ~70ms (deactivate + reactivate + ndefRead)。
 //
-// 案 E: 発声中は retry を行わない (1 回のみ試行)。
-// 理由: TTS 発声中はスピーカー電源負荷 + EMI で NFC RF が劣化し、20ms 程度の
-// retry 間隔では tag が応答を回復しない。retry が AFE feed task を ~250ms
-// starve させて Ringbuffer full を引き起こすが、発声中は救えないので副作用のみ。
-// 非発声時は従来通り MAX_RETRY=2 で recover を狙う。
+// 例外: TTS 発声中は retry を行わない (1 回のみ試行)。スピーカー電源負荷 +
+// EMI で NFC RF が劣化し 20ms 程度の retry 間隔では tag が応答を回復しない。
+// retry が AFE feed task を ~250ms starve させて Ringbuffer full を引き起こす
+// が、発声中は救えないので副作用のみ。非発声時は MAX_RETRY=2 で recover を狙う。
 bool read_ndef_with_retry(m5::nfc::a::PICC& u, std::vector<m5::nfc::ndef::TLV>& tlvs)
 {
     const int max_retry = hal_bridge::is_xiaozhi_speaking() ? 1 : 3;
@@ -167,7 +162,7 @@ void process_picc(m5::nfc::a::PICC& u,
 }
 
 // 1 cycle 分の poll: units->update → detect → 全 PICC 処理 → deactivate。
-// 案 X': detect timeout 50ms (default 1000ms)。1 秒待つと busy ratio が
+// detect timeout は 50ms (default 1000ms から短縮)。1 秒待つと busy ratio が
 // 80%+ になり FT6336 touch poll が starve するため。
 void poll_once(std::vector<NfcTagEvent_t>& tag_events,
                std::vector<NfcCmdEvent_t>& cmd_events)
@@ -195,7 +190,7 @@ static void _nfc_task(void* /*param*/)
 {
     while (1) {
         if (_units && _unit_nfc && _nfc_a) {
-            // 案 N2: emit を NFC busy 終了後に集約する。handler 内の重い処理
+            // emit を NFC busy 終了後に集約する。handler 内の重い処理
             // (LVGL toast / OGG demux 等) が busy 期間を伸ばさないように。
             // 安全性: handler は move/setColor/Toast/PlaySound いずれも I2C 非使用。
             std::vector<NfcTagEvent_t> tag_events;
@@ -212,7 +207,7 @@ static void _nfc_task(void* /*param*/)
                 GetHAL().onNfcCmdReceived.emit(cev);
             }
         }
-        // detect timeout 50ms (案 X') により busy 期間短縮、poll 周期 100ms。
+        // detect timeout 50ms により busy 期間短縮、poll 周期 100ms。
         vTaskDelay(pdMS_TO_TICKS(100));
     }
 }

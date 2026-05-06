@@ -10,7 +10,7 @@
 namespace stackchan::avatar::image {
 
 // Index file (avatar.json) entry — Launcher-menu friendly inline metadata.
-// Phase 1.5c.2: skin folder = `<id>`, manifest path = `/sdcard/<id>/manifest.json`
+// Skin folder = `<id>`, manifest path = `/sdcard/<id>/manifest.json`
 // (manifest/thumbnail filenames implicit; no separate fields needed).
 struct SkinIndexEntry {
     std::string id;
@@ -30,7 +30,7 @@ struct SkinLoadResult {
     std::string loaded_skin_id;      // ID of the skin actually loaded (e.g., "ponko" or "default").
 };
 
-// Top-level loader (Phase 1.5c.2 — SD-only):
+// Top-level loader (SD-only):
 //   1. Read /sdcard/avatar.json and parse as AvatarIndex.
 //   2. Determine current skin id: NVS override > avatar.json's "current".
 //   3. Load /sdcard/<id>/manifest.json + each PNG into PSRAM-backed PngBuffer.

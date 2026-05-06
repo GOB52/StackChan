@@ -84,7 +84,7 @@ private:
     std::unique_ptr<uitk::lvgl_cpp::Container> _thumb_box;   // border around thumb
     std::unique_ptr<uitk::lvgl_cpp::Image>     _thumb_image;
 
-    // Per-field labels (Q3=個別 ─ split, with WRAP on author for long manifest text).
+    // Per-field labels (split, with WRAP on author for long manifest text).
     std::unique_ptr<uitk::lvgl_cpp::Label>     _name_label;
     std::unique_ptr<uitk::lvgl_cpp::Label>     _version_label;
     std::unique_ptr<uitk::lvgl_cpp::Label>     _author_label;

@@ -200,7 +200,7 @@ private:
 };
 
 // ---------------------------------------------------------------------------
-// Below are added by GOB (StackChan firmware fork) for ImageAvatar Phase 2-1.
+// Below are added by GOB (StackChan firmware fork) for ImageAvatar.
 // SleepyDecorator: PNG image "ZZZ" floating upward and fading out, then loops.
 // DoubtDecorator:  PNG image "?" wiggling (rotation) like Heart.
 // ---------------------------------------------------------------------------

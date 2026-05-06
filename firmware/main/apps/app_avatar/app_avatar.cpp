@@ -15,8 +15,8 @@
 #include <apps/common/common.h>
 
 // 0 = DefaultAvatar (upstream), 1 = ImageAvatar from SD (StackChan fork by GOB)
-// Phase 1.5c.2+: ImageAvatar always loads from SD; on any failure
-// (no card / mount fail / JSON or PNG missing) falls back to DefaultAvatar.
+// ImageAvatar always loads from SD; on any failure (no card / mount fail /
+// JSON or PNG missing) falls back to DefaultAvatar.
 #define USE_PONKO_AVATAR 1
 
 // 1 = cycle Neutral/Happy/Angry/Sad every 5s for emotion + decorator pipeline check

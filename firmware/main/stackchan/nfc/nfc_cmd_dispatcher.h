@@ -1,9 +1,8 @@
 // StackChan firmware fork - new file by GOB (X:@GOB_52_GOB / GitHub:GOB52)
 //
-// Phase 1c — Parses stackchan:cmd MIME payloads (UTF-8 JSON) emitted by
-// hal_nfc and dispatches to per-command handlers. Phase 1c only ships stub
-// handlers that log the parsed args; Phase 2 will replace them with thin
-// wrappers around existing MCP tools (`self.robot.set_head_angles` etc.).
+// Parses stackchan:cmd MIME payloads (UTF-8 JSON) emitted by hal_nfc and
+// dispatches to per-command handlers. Handlers are thin wrappers around the
+// shared actions/ layer (same code path as `self.robot.*` MCP tools).
 #pragma once
 #include <ArduinoJson.hpp>
 #include <functional>
@@ -35,7 +34,7 @@ public:
     // Process-wide singleton (owns signal binding state).
     static CmdDispatcher& instance();
 
-    // Register the built-in stub handlers and connect to HAL. Safe to call
+    // Register the built-in command handlers and connect to HAL. Safe to call
     // multiple times.
     static void initOnce();
 

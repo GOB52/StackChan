@@ -22,8 +22,8 @@ constexpr int              _SUPPORTED_VERSION = 1;
 // Decorator pool (ToastDecorator::stack, mirrors ToastManager behavior).
 constexpr uint32_t _TOAST_MS = 2000;
 
-// Phase 3 validation — ranges/units mirror the corresponding self.robot.*
-// MCP tools so AI voice and NFC tags share semantics.
+// Validation — ranges/units mirror the corresponding self.robot.* MCP tools
+// so AI voice and NFC tags share semantics.
 //   move  : x=yaw deg (-128..128), y=pitch deg (0..90), internally *10
 //           before moveWithSpeed (matches set_head_angles).
 //   rgb   : r/g/b 0..168 (matches set_led_color "safe range").
@@ -41,8 +41,7 @@ constexpr int _RGB_MIN        =  0;
 constexpr int _RGB_MAX        =  168;
 
 // Type-checked extraction. Missing key uses default. Returns false when
-// the key exists but has a wrong type — caller then drops the entire cmd
-// (Q4: reject on type mismatch).
+// the key exists but has a wrong type — caller then drops the entire cmd.
 bool extract_int(const ArduinoJson::JsonObjectConst& args, const char* cmd,
                  const char* key, int default_val, int& out)
 {
@@ -69,8 +68,8 @@ bool extract_str(const ArduinoJson::JsonObjectConst& args, const char* cmd,
     return true;
 }
 
-// Clamp with warn log. Numeric values are clamped (Q1=c hybrid: numbers
-// clamp, strings/enums reject).
+// Clamp with warn log. Numeric values clamp; strings/enums reject (handled
+// in extract_str by returning false).
 int clamp_int(const char* cmd, const char* key, const int v, const int min, const int max)
 {
     if (v < min) {
@@ -160,15 +159,14 @@ void CmdDispatcher::initOnce()
     auto& d = instance();
     if (d._connected) return;
 
-    // Phase 2a — Wrap existing functionality the same way MCP self.robot.*
-    // tools do (LvglLockGuard + GetStackChan() / motion / neon light). Wrapping
-    // here (rather than via the MCP server's JSON-RPC path) keeps this fork
-    // free of xiaozhi-side patches; the underlying API calls are identical.
+    // Wrap existing functionality the same way MCP self.robot.* tools do
+    // (LvglLockGuard + GetStackChan() / motion / neon light). Wrapping here
+    // (rather than via the MCP server's JSON-RPC path) keeps this fork free
+    // of xiaozhi-side patches; the underlying API calls are identical.
     //
-    // Codex spec units (tmp/stackchan_ndef_command_type.md):
+    // NDEF cmd unit conventions:
     //   move: x=yaw, y=pitch, s=speed. Angles in 0.1° units (10 = 1°).
     //   rgb : r/g/b 0..255.
-    // Phase 3 will add range clamping / validation per cmd.
 
     d.registerHandler("move", [](const ArduinoJson::JsonObjectConst& args) {
         // x=yaw deg, y=pitch deg (mirrors MCP set_head_angles unit). Internally
@@ -220,9 +218,9 @@ void CmdDispatcher::initOnce()
         stackchan::avatar::pop_avatar_toast(buf, view::ToastType::Info, _TOAST_MS);
     });
 
-    // Phase 2b — wired to actions/ shared layer. The same logic powers
-    // the corresponding self.robot.* MCP tools so AI voice and NFC tags
-    // produce identical behavior. See stackchan/actions/robot_actions.{h,cpp}.
+    // Wired to actions/ shared layer. The same logic powers the
+    // corresponding self.robot.* MCP tools so AI voice and NFC tags produce
+    // identical behavior. See stackchan/actions/robot_actions.{h,cpp}.
     d.registerHandler("home", [](const ArduinoJson::JsonObjectConst& args) {
         int s;
         if (!extract_int(args, "home", "s", _HOME_SPEED_DEF, s)) {

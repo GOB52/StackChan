@@ -93,7 +93,7 @@ void SkinBrowserPage::build_ui()
     _thumb_image = std::make_unique<Image>(*_thumb_box);
     _thumb_image->align(LV_ALIGN_CENTER, 0, 0);
 
-    // Info column (right of thumb): individual labels (Q3=個別).
+    // Info column (right of thumb): individual labels.
     const int info_x = 12 + THUMB_W + 4 + 12;   // x = 108
     const int info_w = 320 - info_x - 12;       // w = 200
 

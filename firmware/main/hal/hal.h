@@ -55,8 +55,7 @@ enum class ImuMotionEvent {
 
 /**
  * @brief NFC tag detection event payload (GOB fork: M5Unit-NFC integration).
- * Phase 1a: UID + classified type only. NDEF / cmd payload decoding planned
- * for Phase 1b.
+ * UID + classified PICC type (no NDEF payload).
  */
 struct NfcTagEvent_t {
     std::string uid;   // hex string (e.g. "04A1B2C3D4E5F6")
@@ -64,10 +63,9 @@ struct NfcTagEvent_t {
 };
 
 /**
- * @brief stackchan:cmd NDEF record received from a PICC (GOB fork, Phase 1b).
+ * @brief stackchan:cmd NDEF record received from a PICC (GOB fork).
  * Payload is the raw bytes of an NDEF MIME record whose type string equals
- * "application/vnd.stackchan.cmd+json" (RFC 6838 vendor tree). JSON parsing
- * and dispatch happen in Phase 1c.
+ * "application/vnd.stackchan.cmd+json" (RFC 6838 vendor tree).
  */
 struct NfcCmdEvent_t {
     std::string          uid;      // tag UID for logging / future idempotency
@@ -264,10 +262,10 @@ public:
     uitk::Signal<ImuMotionEvent> onImuMotionEvent;
 
     /* ----------------------------------- NFC ---------------------------------- */
-    // GOB fork: M5Unit-NFC tag detection. Phase 1a — UID/type only.
+    // GOB fork: M5Unit-NFC tag detection. UID/type only.
     uitk::Signal<const NfcTagEvent_t&> onNfcTagDetected;
-    // GOB fork: stackchan:cmd NDEF record received (Phase 1b). Emitted once per
-    // matching External Type record on the tag; payload is raw bytes.
+    // GOB fork: stackchan:cmd NDEF record received. Emitted once per matching
+    // External Type record on the tag; payload is raw bytes.
     uitk::Signal<const NfcCmdEvent_t&> onNfcCmdReceived;
     // Lazily initialize UnitNFC + start poll task. Called from the
     // stackchan update task once xiaozhi is ready, so that the audio

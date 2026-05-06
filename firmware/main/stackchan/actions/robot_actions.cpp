@@ -1,9 +1,9 @@
 // StackChan firmware fork - new file by GOB (X:@GOB_52_GOB / GitHub:GOB52)
 //
-// Phase 2b — implementation. Acquires LvglLockGuard before touching
-// motion/modifier state (matches the pattern used by self.robot.* MCP
-// tools). Dance modifier ID is tracked atomically so a new dance request
-// or stop_dance() can replace/cancel the in-flight one safely.
+// Acquires LvglLockGuard before touching motion/modifier state (matches the
+// pattern used by self.robot.* MCP tools). Dance modifier ID is tracked
+// atomically so a new dance request or stop_dance() can replace/cancel the
+// in-flight one safely.
 #include "robot_actions.h"
 #include "../stackchan.h"
 #include "../modifiers/dance.h"

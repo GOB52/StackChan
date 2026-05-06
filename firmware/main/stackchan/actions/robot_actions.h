@@ -1,6 +1,6 @@
 // StackChan firmware fork - new file by GOB (X:@GOB_52_GOB / GitHub:GOB52)
 //
-// Phase 2b — shared robot action helpers used by both MCP tools
+// Shared robot action helpers used by both MCP tools
 // (firmware/main/hal/hal_mcp.cpp) and NFC command dispatcher
 // (firmware/main/stackchan/nfc/nfc_cmd_dispatcher.cpp). Single source of
 // truth so AI voice and physical NFC tags trigger identical behavior.
