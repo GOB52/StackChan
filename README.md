@@ -1,4 +1,49 @@
+# StackChan GOB fork
+
+> ## $\color{red}{\textsf{重要 / IMPORTANT}}$
+>
+> 本 fork ファームウェア (GOB fork) を書き込んだ後、**M5Burner 等で公式ファームウェアに書き戻すと、Wi-Fi / xiaozhi 接続情報など各種設定がリセットされ、再設定が必要** になります (M5Burner の書き込みが NVS partition も上書きするため)。
+>
+> ### 設定を引き継ぎたい場合 (実機検証済み)
+>
+> 書き戻し前に NVS partition (16 KB) を退避し、書き戻し後に復元することで、Wi-Fi / WSS / MQTT 等の xiaozhi 設定をそのまま引き継げます。`esptool.py` 必須。
+>
+> ```bash
+> # 1. 公式焼く前に NVS 退避
+> esptool.py --port /dev/tty.usbmodemXXXX --baud 460800 read_flash 0x9000 0x4000 nvs_backup.bin
+>
+> # 2. M5Burner で公式 firmware を焼く (通常通り Start)
+>
+> # 3. NVS 復元 (自動リセット)
+> esptool.py --port /dev/tty.usbmodemXXXX --baud 460800 write_flash 0x9000 nvs_backup.bin
+> ```
+>
+> なお、**公式 → fork 方向 (`idf.py flash` 等での書き込み) では NVS は自動的に引き継がれます** (app partition のみ書き換わり、NVS partition は触れないため)。退避/復元手順が必要なのは fork → 公式 (M5Burner 経由) のときのみです。
+>
+> ---
+>
+> After flashing this fork (GOB fork) firmware, **re-flashing the official firmware via M5Burner (or similar tools) wipes Wi-Fi / xiaozhi connection settings and requires re-configuration** (M5Burner overwrites the NVS partition).
+>
+> ### To preserve settings (verified on real hardware)
+>
+> Dump the NVS partition (16 KB) before re-flashing and restore it afterwards. Wi-Fi / WSS / MQTT and other xiaozhi settings carry over. Requires `esptool.py`.
+>
+> ```bash
+> # 1. Backup NVS before flashing
+> esptool.py --port /dev/tty.usbmodemXXXX --baud 460800 read_flash 0x9000 0x4000 nvs_backup.bin
+>
+> # 2. Flash the official firmware via M5Burner (normal Start)
+>
+> # 3. Restore NVS (auto-resets)
+> esptool.py --port /dev/tty.usbmodemXXXX --baud 460800 write_flash 0x9000 nvs_backup.bin
+> ```
+>
+> Note that **the official → fork direction (e.g. `idf.py flash`) preserves NVS automatically** because only the app partition is rewritten while the NVS partition is untouched. The backup/restore steps above are only needed in the fork → official direction (via M5Burner).
+
+
+---
 # StackChan Open-Source
+
 
 <img src="https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1205/K151_stack_chan_main_pictures_01.webp" width="60%">
 
