@@ -117,10 +117,15 @@ dependencies:
     - if: target in [esp32s3, esp32c5]
 
   espressif/esp_lcd_touch_st7123: ^1.0.0
-  espressif/iot_usbh_rndis: 
+  espressif/iot_usbh_rndis:
     version: ^0.3.1
     rules:
     - if: target in [esp32s3, esp32p4]
+
+  ## GOB fork: M5Unit-NFC (transitively pulls M5UnitUnified/M5HAL/M5Utility)
+  m5stack/M5Unit-NFC:
+    git: https://github.com/m5stack/M5Unit-NFC.git
+    version: feature/esp-idf-native-support
 
   ## Required IDF version
   idf:
