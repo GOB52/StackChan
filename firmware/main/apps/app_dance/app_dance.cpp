@@ -8,6 +8,7 @@
 #include <mooncake.h>
 #include <mooncake_log.h>
 #include <stackchan/stackchan.h>
+#include <stackchan/avatar/skins/image/skin_loader.h>
 #include <apps/common/common.h>
 #include <assets/assets.h>
 
@@ -52,10 +53,12 @@ void AppDance::onOpen()
     // Destroy loading page
     loading_page.reset();
 
-    // Create default avatar
-    auto avatar = std::make_unique<avatar::DefaultAvatar>();
-    avatar->init(lv_screen_active());
-    GetStackChan().attachAvatar(std::move(avatar));
+    // Create selected ImageAvatar from SD, falling back to DefaultAvatar on failure.
+    auto skin = avatar::image::load_avatar_or_fallback(lv_screen_active());
+    GetStackChan().attachAvatar(std::move(skin.avatar));
+    if (!skin.error_message.empty()) {
+        view::pop_a_toast(skin.error_message, view::ToastType::Error, 12000);
+    }
 
     /* ------------------------------- BLE events ------------------------------- */
     GetHAL().onBleAvatarData.connect([&](const char* data) {

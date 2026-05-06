@@ -12,12 +12,8 @@
 #include <assets/assets.h>
 #include <smooth_lvgl.hpp>
 #include <stackchan/stackchan.h>
+#include <stackchan/avatar/skins/image/skin_loader.h>
 #include <apps/common/common.h>
-
-// 0 = DefaultAvatar (upstream), 1 = ImageAvatar from SD (StackChan fork by GOB)
-// ImageAvatar always loads from SD; on any failure (no card / mount fail /
-// JSON or PNG missing) falls back to DefaultAvatar.
-#define USE_PONKO_AVATAR 1
 
 // 1 = cycle Neutral/Happy/Angry/Sad every 5s for emotion + decorator pipeline check
 #define ENABLE_EMOTION_TEST 0
@@ -25,10 +21,6 @@
 // 1 = always-on SpeakingModifier (mouth flapping) for mouth animation check
 #define ENABLE_SPEAKING_TEST 0
 
-#if USE_PONKO_AVATAR
-#include <stackchan/avatar/skins/image/skin_loader.h>
-// toast.h is already included via apps/common/common.h
-#endif
 #include <string_view>
 #include <cstdint>
 #include <memory>
@@ -100,9 +92,7 @@ void AppAvatar::onOpen()
     // Destroy loading page
     loading_page.reset();
 
-    // Create avatar (DefaultAvatar or ImageAvatar from SD, switched via USE_PONKO_AVATAR)
     std::string skin_load_error;  // populated only on SD load error → top toast after attach
-#if USE_PONKO_AVATAR
     {
         // SD-only loader: returns ImageAvatar on success, DefaultAvatar on any failure
         // (no card / mount fail / JSON or PNG missing). error_message is populated on failure.
@@ -113,13 +103,6 @@ void AppAvatar::onOpen()
         }
         GetStackChan().attachAvatar(std::move(skin.avatar));
     }
-#else
-    {
-        auto avatar = std::make_unique<avatar::DefaultAvatar>();
-        avatar->init(lv_screen_active());
-        GetStackChan().attachAvatar(std::move(avatar));
-    }
-#endif
 
     // Register autonomous animation modifiers (StackChan fork by GOB)
     GetStackChan().addModifier(std::make_unique<BlinkModifier>());
@@ -262,12 +245,10 @@ void AppAvatar::onOpen()
     view::create_home_indicator([&]() { close(); }, 0xFF9ABC, 0x431525);
     view::create_status_bar(0xFF9ABC, 0x431525);
 
-#if USE_PONKO_AVATAR
     // Show top toast on skin-load failure (12s, same convention as WS errors).
     if (!skin_load_error.empty()) {
         view::pop_a_toast(skin_load_error, view::ToastType::Error, 12000);
     }
-#endif
 }
 
 void AppAvatar::onRunning()
@@ -294,16 +275,12 @@ void AppAvatar::onRunning()
         static uint32_t last_emo_tick = 0;
         static int emo_idx            = 0;
         if (GetHAL().millis() - last_emo_tick > 5000) {
-            last_emo_tick = GetHAL().millis();
+            last_emo_tick                = GetHAL().millis();
             const avatar::Emotion emos[] = {
-                avatar::Emotion::Neutral,
-                avatar::Emotion::Happy,
-                avatar::Emotion::Angry,
-                avatar::Emotion::Sad,
-                avatar::Emotion::Doubt,
-                avatar::Emotion::Sleepy,
+                avatar::Emotion::Neutral, avatar::Emotion::Happy, avatar::Emotion::Angry,
+                avatar::Emotion::Sad,     avatar::Emotion::Doubt, avatar::Emotion::Sleepy,
             };
-            const char* names[] = {"Neutral", "Happy", "Angry", "Sad", "Doubt", "Sleepy"};
+            const char* names[]     = {"Neutral", "Happy", "Angry", "Sad", "Doubt", "Sleepy"};
             constexpr int EMO_COUNT = sizeof(emos) / sizeof(emos[0]);
             mclog::tagInfo(getAppInfo().name, "emotion test: {}", names[emo_idx]);
             GetStackChan().avatar().setEmotion(emos[emo_idx]);

@@ -269,7 +269,8 @@ void AppGobFork::enter_skin_browser()
         }
         mclog::tagInfo(getAppInfo().name, "skin saved: {}", id);
         stackchan::hal::SdGuard::unmount();  // GOB fork: page 終了で unmount
-        close();
+        _switch_pending = true;
+        _pending_page   = Page::Main;
     };
     auto on_back = [this]() {
         stackchan::hal::SdGuard::unmount();  // GOB fork: page 終了で unmount
