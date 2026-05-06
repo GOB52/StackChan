@@ -812,6 +812,25 @@ dependencies:
     - esp32c6
     - esp32p4
     version: f91cb7b97a834ff4c271f4a26a17bc2e06c6eed9
+  m5stack/M5Unit-INFRARED:
+    component_hash: 77e8359d945a146341051fb93d0ba51303447b53dec1ab709f739858aa368f64
+    dependencies:
+    - name: idf
+      version: '>=5.0'
+    - git: https://github.com/m5stack/M5UnitUnified.git
+      name: m5stack/M5UnitUnified
+      version: feature/esp-idf-native-support
+    source:
+      git: https://github.com/m5stack/M5Unit-INFRARED.git
+      path: .
+      type: git
+    targets:
+    - esp32
+    - esp32s3
+    - esp32c3
+    - esp32c6
+    - esp32p4
+    version: 87a04f344310212461dc94a3a162d297f88e7130
   m5stack/M5Unit-NFC:
     component_hash: a0b1ed0a7b9549ca26b7222d5070ca6ef17d629b2a07084cb5aa161a0fdbdede
     dependencies:
@@ -986,6 +1005,7 @@ direct_dependencies:
 - espressif2022/image_player
 - idf
 - lvgl/lvgl
+- m5stack/M5Unit-INFRARED
 - m5stack/M5Unit-NFC
 - tny-robotics/sh1106-esp-idf
 - txp666/otto-emoji-gif-component
@@ -993,6 +1013,6 @@ direct_dependencies:
 - waveshare/esp_lcd_sh8601
 - waveshare/esp_lcd_touch_cst9217
 - wvirgil123/sscma_client
-manifest_hash: d9c712869bf681ff12724706f04973ccaf40af564af39d723a0424d64d100d21
+manifest_hash: 1a28cf282688f6b2a3304e54684feceed8cedab3e5e20ee5d275aa88caeccda2
 target: esp32s3
 version: 2.0.0

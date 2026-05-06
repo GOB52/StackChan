@@ -127,6 +127,11 @@ dependencies:
     git: https://github.com/m5stack/M5Unit-NFC.git
     version: feature/esp-idf-native-support
 
+  ## GOB fork: M5Unit-INFRARED (transitively pulls M5UnitUnified/M5HAL/M5Utility)
+  m5stack/M5Unit-INFRARED:
+    git: https://github.com/m5stack/M5Unit-INFRARED.git
+    version: feature/esp-idf-native-support
+
   ## Required IDF version
   idf:
     version: '>=5.5.2'
