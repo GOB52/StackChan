@@ -40,6 +40,10 @@
 >
 > Note that **the official → fork direction (e.g. `idf.py flash`) preserves NVS automatically** because only the app partition is rewritten while the NVS partition is untouched. The backup/restore steps above are only needed in the fork → official direction (via M5Burner).
 
+## GOB fork ドキュメント / Additional Docs
+
+- [Avatar.md](Avatar.md) — アバター / スキン JSON 仕様 (Avatar & skin JSON spec)
+- [NFC.md](NFC.md) — NFC タグコマンド (NFC tag command reference)
 
 ---
 # StackChan Open-Source
