@@ -16,6 +16,7 @@
 #include <vector>
 #include <lvgl.h>
 #include <src/draw/lv_image_dsc.h>
+#include <stackchan/gob_fork_nvs.h>  // GOB fork: time format 12H/24H setting
 
 using namespace smooth_ui_toolkit;
 using namespace smooth_ui_toolkit::lvgl_cpp;
@@ -113,18 +114,22 @@ public:
 
     void update() override
     {
-        auto now   = std::chrono::system_clock::now();
-        auto now_t = std::chrono::system_clock::to_time_t(now);
+        const auto now   = std::chrono::system_clock::now();
+        const auto now_t = std::chrono::system_clock::to_time_t(now);
 
         struct tm local_tm;
         localtime_r(&now_t, &local_tm);
 
-        int hour12 = local_tm.tm_hour % 12;
-        if (hour12 == 0) {
-            hour12 = 12;
+        // GOB fork: 12H/24H switch via NVS (gob_fork::time_24h, default 12H).
+        if (stackchan::gob_fork::get_time_format_24h()) {
+            _label->setText(fmt::format("{:02d}:{:02d}", local_tm.tm_hour, local_tm.tm_min));
+        } else {
+            const int hour12 = ((local_tm.tm_hour % 12) == 0) ? 12 : (local_tm.tm_hour % 12);
+            _label->setText(fmt::format("{}:{:02d} {}",
+                                        hour12,
+                                        local_tm.tm_min,
+                                        local_tm.tm_hour >= 12 ? "PM" : "AM"));
         }
-
-        _label->setText(fmt::format("{}:{:02d} {}", hour12, local_tm.tm_min, local_tm.tm_hour >= 12 ? "PM" : "AM"));
     }
 
 private:

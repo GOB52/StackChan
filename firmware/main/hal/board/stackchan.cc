@@ -18,6 +18,8 @@
 #include <esp_timer.h>
 #include "stackchan_camera.h"
 #include "hal_bridge.h"
+#include "sd_guard.h"
+#include "../hal.h"  // GOB fork: Hal::isNfcBusy() for FT6336 / NFC I2C arbitration
 
 #define TAG "M5Stack-StackChan-Board"
 
@@ -66,6 +68,12 @@ public:
         } else {
             ESP_LOGI(TAG, "Set charge current success");
         }
+
+        // GOB fork: AXP2101 charge-related register dump for charging diagnostics.
+        // 0x18 bit1 = CHG_EN (charge enable). 0x62 = ICC_CHG_SET (constant charge current).
+        // 0x14 = Min sys voltage. 0x16 = VBUS input current limit.
+        ESP_LOGI(TAG, "AXP2101 reg dump: 0x18=0x%02X 0x62=0x%02X 0x14=0x%02X 0x16=0x%02X",
+                 ReadReg(0x18), ReadReg(0x62), ReadReg(0x14), ReadReg(0x16));
 
         SetBrightness(0);
     }
@@ -160,6 +168,15 @@ public:
         vTaskDelay(pdMS_TO_TICKS(20));
         WriteReg(0x03, 0b10000011);
         vTaskDelay(pdMS_TO_TICKS(10));
+    }
+
+    // P0_4 = TF_SW (SD card detect, verified via toggle test on M5Stack CoreS3).
+    // Pulled high via R28 10K to VDD_3V3, switch closes to GND when card present.
+    // P0 inputs configured: P0_3, P0_4. P1 inputs: P1_2, P1_3.
+    bool IsSdCardInserted()
+    {
+        uint8_t p0 = ReadReg(0x00);  // P0 input register
+        return (p0 & (1 << 4)) == 0;
     }
 };
 
@@ -299,6 +316,14 @@ private:
         esp_timer_create_args_t timer_args = {
             .callback =
                 [](void* arg) {
+                    // SD アクセス中は I2C bus 競合 (touchpad I2C timeout → abort) を
+                    // 避けるため touchpad poll を skip する。SdGuard 生存中のみ。
+                    if (stackchan::hal::SdGuard::isActive()) return;
+                    // GOB fork: NFC poll task (core 1) が I2C を使用中なら skip。
+                    // 同 I2C bus を別コアから同時取得すると FT6336 timeout +
+                    // bus stuck (ESP_ERR_INVALID_STATE) → reboot に至るため、
+                    // この 1 周期 (20ms) を諦めることで安全側に倒す。
+                    if (Hal::isNfcBusy()) return;
                     M5StackCoreS3Board* board = (M5StackCoreS3Board*)arg;
                     board->PollTouchpad();
                 },
@@ -314,8 +339,23 @@ private:
 
     void InitializeSpi()
     {
+        // Drive SD CS (GPIO4) HIGH before any SPI activity to keep the SD card
+        // deselected on the shared SPI3 bus. If left floating, the card may
+        // intermittently drive MISO (= GPIO35 = LCD_DC), corrupting LCD writes.
+        gpio_config_t cs_cfg = {};
+        cs_cfg.pin_bit_mask  = 1ULL << GPIO_NUM_4;
+        cs_cfg.mode          = GPIO_MODE_OUTPUT;
+        cs_cfg.pull_up_en    = GPIO_PULLUP_ENABLE;
+        cs_cfg.pull_down_en  = GPIO_PULLDOWN_DISABLE;
+        cs_cfg.intr_type     = GPIO_INTR_DISABLE;
+        ESP_ERROR_CHECK(gpio_config(&cs_cfg));
+        gpio_set_level(GPIO_NUM_4, 1);
+
         spi_bus_config_t buscfg = {};
         buscfg.mosi_io_num      = GPIO_NUM_37;
+        // GPIO35 is SPI_MISO on the CoreS3 schematic but is reused as LCD_DC by
+        // the LCD I/O driver below. Keep MISO unrouted by default (LCD-only mode);
+        // SdGuard dynamically wires MISO via GPIO matrix only during SD access.
         buscfg.miso_io_num      = GPIO_NUM_NC;
         buscfg.sclk_io_num      = GPIO_NUM_36;
         buscfg.quadwp_io_num    = GPIO_NUM_NC;
@@ -474,6 +514,11 @@ public:
     {
         return i2c_bus_;
     }
+
+    bool IsSdCardInserted()
+    {
+        return aw9523_ ? aw9523_->IsSdCardInserted() : false;
+    }
 };
 
 DECLARE_BOARD(M5StackCoreS3Board);
@@ -482,6 +527,12 @@ i2c_master_bus_handle_t hal_bridge::board_get_i2c_bus()
 {
     auto& board = (M5StackCoreS3Board&)Board::GetInstance();
     return board.GetI2cBus();
+}
+
+bool hal_bridge::board_is_sd_inserted()
+{
+    auto& board = (M5StackCoreS3Board&)Board::GetInstance();
+    return board.IsSdCardInserted();
 }
 
 StackChanCamera* hal_bridge::board_get_camera()

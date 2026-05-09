@@ -8,11 +8,12 @@
 using namespace view;
 using namespace uitk::lvgl_cpp;
 
-SelectMenuPage::SelectMenuPage(std::vector<MenuSection> sections) : _sections(std::move(sections))
+SelectMenuPage::SelectMenuPage(std::vector<MenuSection> sections, Colors colors)
+    : _sections(std::move(sections)), _colors(colors)
 {
     _pannel = std::make_unique<uitk::lvgl_cpp::Container>(lv_screen_active());
     _pannel->setSize(320, 240);
-    _pannel->setBgColor(lv_color_hex(0xEDF4FF));
+    _pannel->setBgColor(lv_color_hex(_colors.panel_bg));
     _pannel->setPadding(30, 72, 0, 0);
     _pannel->setBorderWidth(0);
     _pannel->setRadius(0);
@@ -53,12 +54,23 @@ void SelectMenuPage::update()
     }
 }
 
+// GOB fork: scroll position get/set (see header comment).
+int SelectMenuPage::getScrollY() const
+{
+    return lv_obj_get_scroll_y(_pannel->raw_ptr());
+}
+
+void SelectMenuPage::setScrollY(const int y)
+{
+    lv_obj_scroll_to_y(_pannel->raw_ptr(), y, LV_ANIM_OFF);
+}
+
 void SelectMenuPage::create_selection_label(int x, int y, std::string_view text)
 {
     auto label = std::make_unique<uitk::lvgl_cpp::Label>(*_pannel);
     label->setText(text);
     label->setTextFont(&lv_font_montserrat_16);
-    label->setTextColor(lv_color_hex(0x6A6882));
+    label->setTextColor(lv_color_hex(_colors.section_text));
     label->setPos(x, y);
     _labels.push_back(std::move(label));
 }
@@ -68,14 +80,14 @@ void SelectMenuPage::create_item_button(int y, const MenuItem& item, int section
     auto btn = std::make_unique<uitk::lvgl_cpp::Button>(*_pannel);
     btn->setSize(282, 48);
     btn->align(LV_ALIGN_TOP_MID, 0, y);
-    btn->setBgColor(lv_color_hex(0xB8D3FD));
+    btn->setBgColor(lv_color_hex(_colors.btn_bg));
     btn->setBorderWidth(0);
     btn->setShadowWidth(0);
     btn->setRadius(18);
 
     btn->label().setText(item.label);
     btn->label().setTextFont(&lv_font_montserrat_24);
-    btn->label().setTextColor(lv_color_hex(0x26206A));
+    btn->label().setTextColor(lv_color_hex(_colors.btn_text));
     btn->label().align(LV_ALIGN_CENTER, 0, 0);
     btn->label().setWidth(256);
     btn->label().setTextAlign(LV_TEXT_ALIGN_CENTER);

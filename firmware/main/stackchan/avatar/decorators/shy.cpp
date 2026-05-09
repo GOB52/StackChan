@@ -69,6 +69,13 @@ void ShyDecorator::setPosition(int x, int y)
     }
 }
 
+// GOB fork: independent left / right placement (LV_ALIGN_CENTER offset).
+void ShyDecorator::setLeftRightPosition(int lx, int ly, int rx, int ry)
+{
+    if (_left)  _left->setPos(lx, ly);
+    if (_right) _right->setPos(rx, ry);
+}
+
 void ShyDecorator::setRotation(int rotation)
 {
     if (_left) {

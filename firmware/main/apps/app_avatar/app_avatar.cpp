@@ -3,6 +3,7 @@
  *
  * SPDX-License-Identifier: MIT
  */
+// Modified by GOB (X:@GOB_52_GOB / GitHub:GOB52) - StackChan firmware fork
 #include "app_avatar.h"
 #include "view/ws_call.h"
 #include <hal/hal.h>
@@ -11,7 +12,15 @@
 #include <assets/assets.h>
 #include <smooth_lvgl.hpp>
 #include <stackchan/stackchan.h>
+#include <stackchan/avatar/skins/image/skin_loader.h>
 #include <apps/common/common.h>
+
+// 1 = cycle Neutral/Happy/Angry/Sad every 5s for emotion + decorator pipeline check
+#define ENABLE_EMOTION_TEST 0
+
+// 1 = always-on SpeakingModifier (mouth flapping) for mouth animation check
+#define ENABLE_SPEAKING_TEST 0
+
 #include <string_view>
 #include <cstdint>
 #include <memory>
@@ -83,10 +92,24 @@ void AppAvatar::onOpen()
     // Destroy loading page
     loading_page.reset();
 
-    // Create default avatar
-    auto avatar = std::make_unique<avatar::DefaultAvatar>();
-    avatar->init(lv_screen_active());
-    GetStackChan().attachAvatar(std::move(avatar));
+    std::string skin_load_error;  // populated only on SD load error → top toast after attach
+    {
+        // SD-only loader: returns ImageAvatar on success, DefaultAvatar on any failure
+        // (no card / mount fail / JSON or PNG missing). error_message is populated on failure.
+        // NVS-based skin selection is managed via the GOB FORK app's Skin Browser.
+        auto skin = avatar::image::load_avatar_or_fallback(lv_screen_active());
+        if (!skin.error_message.empty()) {
+            skin_load_error = skin.error_message;
+        }
+        GetStackChan().attachAvatar(std::move(skin.avatar));
+    }
+
+    // Register autonomous animation modifiers (StackChan fork by GOB)
+    GetStackChan().addModifier(std::make_unique<BlinkModifier>());
+#if ENABLE_SPEAKING_TEST
+    // Continuous mouth flapping (motion disabled: motion may be unattached in this app)
+    GetStackChan().addModifier(std::make_unique<SpeakingModifier>(0, 180, false));
+#endif
 
     /* ------------------------------- BLE events ------------------------------- */
     GetHAL().onBleAvatarData.connect([&](const char* data) {
@@ -221,6 +244,11 @@ void AppAvatar::onOpen()
     /* ----------------------------- Common widgets ----------------------------- */
     view::create_home_indicator([&]() { close(); }, 0xFF9ABC, 0x431525);
     view::create_status_bar(0xFF9ABC, 0x431525);
+
+    // Show top toast on skin-load failure (12s, same convention as WS errors).
+    if (!skin_load_error.empty()) {
+        view::pop_a_toast(skin_load_error, view::ToastType::Error, 12000);
+    }
 }
 
 void AppAvatar::onRunning()
@@ -241,6 +269,26 @@ void AppAvatar::onRunning()
         _ble_motion_data.update_flag = false;
         _ble_motion_data.data_ptr    = nullptr;
     }
+
+#if ENABLE_EMOTION_TEST
+    {
+        static uint32_t last_emo_tick = 0;
+        static int emo_idx            = 0;
+        if (GetHAL().millis() - last_emo_tick > 5000) {
+            last_emo_tick                = GetHAL().millis();
+            const avatar::Emotion emos[] = {
+                avatar::Emotion::Neutral, avatar::Emotion::Happy, avatar::Emotion::Angry,
+                avatar::Emotion::Sad,     avatar::Emotion::Doubt, avatar::Emotion::Sleepy,
+            };
+            const char* names[]     = {"Neutral", "Happy", "Angry", "Sad", "Doubt", "Sleepy"};
+            constexpr int EMO_COUNT = sizeof(emos) / sizeof(emos[0]);
+            mclog::tagInfo(getAppInfo().name, "emotion test: {}", names[emo_idx]);
+            GetStackChan().avatar().setEmotion(emos[emo_idx]);
+            GetStackChan().avatar().setSpeech(names[emo_idx]);  // 吹き出しに emotion 名表示
+            emo_idx = (emo_idx + 1) % EMO_COUNT;
+        }
+    }
+#endif
 
     GetStackChan().update();
 

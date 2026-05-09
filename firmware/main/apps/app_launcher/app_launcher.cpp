@@ -8,6 +8,7 @@
 #include <mooncake.h>
 #include <mooncake_log.h>
 #include <stackchan/stackchan.h>
+#include <stackchan/gob_fork_nvs.h>
 #include <cstdint>
 
 using namespace mooncake;
@@ -23,6 +24,10 @@ void AppLauncher::onLauncherCreate()
 void AppLauncher::onLauncherOpen()
 {
     mclog::tagInfo(getAppInfo().name, "on open");
+
+    // Re-read screensaver timeout each open so changes from GOB FORK settings
+    // take effect on the next launcher resume (no reboot needed).
+    load_screensaver_timeout();
 
     LvglLockGuard lock;
 
@@ -79,10 +84,14 @@ void AppLauncher::create_launcher_view()
 
 void AppLauncher::screensaver_update()
 {
-    const uint32_t SCREENSAVER_TIMEOUT_MS = 30000;
+    // GOB fork: 0 = Off (NVS-configured via GOB FORK app).
+    if (_screensaver_timeout_ms == 0) {
+        if (_screensaver) _screensaver.reset();
+        return;
+    }
 
     uint32_t idle_time = lv_display_get_inactive_time(NULL);
-    if (idle_time >= SCREENSAVER_TIMEOUT_MS) {
+    if (idle_time >= _screensaver_timeout_ms) {
         if (!_screensaver) {
             _screensaver = std::make_unique<view::Screensaver>();
             _screensaver->init();
@@ -96,4 +105,11 @@ void AppLauncher::screensaver_update()
         _screensaver_timecount = GetHAL().millis();
         _screensaver->update();
     }
+}
+
+void AppLauncher::load_screensaver_timeout()
+{
+    uint32_t s = stackchan::gob_fork::get_screensaver_timeout_s();
+    _screensaver_timeout_ms = s * 1000;
+    mclog::tagInfo(getAppInfo().name, "screensaver timeout: {}s", s);
 }

@@ -42,7 +42,13 @@ void xiaozhi_board_init();
 void start_xiaozhi_app();
 bool is_xiaozhi_ready();
 
+// True while xiaozhi DeviceState == kDeviceStateSpeaking (TTS active).
+// Used to suppress NFC dispatch chime so the notification sound doesn't
+// step on AI speech audio; toast feedback is unaffected.
+bool is_xiaozhi_speaking();
+
 i2c_master_bus_handle_t board_get_i2c_bus();
+bool board_is_sd_inserted();
 StackChanCamera* board_get_camera();
 int board_get_battery_level();
 bool board_is_battery_charging();

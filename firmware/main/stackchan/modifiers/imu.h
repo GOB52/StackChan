@@ -5,8 +5,10 @@
  */
 #pragma once
 #include "../modifiable.h"
+#include "../avatar/decorators/decorators.h"
 #include <hal/hal.h>
 #include <cstdint>
+#include <memory>
 
 namespace stackchan {
 
@@ -82,10 +84,44 @@ private:
 
             stackchan.avatar().removeDecorator(_dizzy_decorator_id);
             stackchan.avatar().removeDecorator(_shy_decorator_id);
-            _dizzy_decorator_id =
-                stackchan.avatar().addDecorator(std::make_unique<avatar::DizzyDecorator>(lv_screen_active(), 0, 300));
-            _shy_decorator_id =
-                stackchan.avatar().addDecorator(std::make_unique<avatar::ShyDecorator>(lv_screen_active(), 0));
+
+            // GOB fork: per-skin Dizzy positioning + manifest-driven color /
+            // anim / scale. Position follows actual eye centers via avatar
+            // virtual; DefaultAvatar returns built-in defaults so behavior
+            // there is unchanged.
+            const auto* dz_cfg = avatar.getDizzyConfig();
+            uint32_t dz_anim   = dz_cfg ? dz_cfg->anim_ms : 300;
+            auto dizzy = std::make_unique<avatar::DizzyDecorator>(lv_screen_active(), 0, dz_anim);
+            if (dz_cfg && dz_cfg->has_color) {
+                dizzy->setColor(lv_color_hex(dz_cfg->color_hex));
+            }
+            if (dz_cfg && dz_cfg->has_scale) {
+                dizzy->setScale(dz_cfg->scale);
+            }
+            // Position priority: manifest dizzy.position > eye-center auto-derive.
+            int lx, ly, rx, ry;
+            if (dz_cfg && dz_cfg->has_position) {
+                lx = dz_cfg->left_x;  ly = dz_cfg->left_y;
+                rx = dz_cfg->right_x; ry = dz_cfg->right_y;
+            } else {
+                auto eye_l = avatar.getEyeCenterOffset(true);
+                auto eye_r = avatar.getEyeCenterOffset(false);
+                lx = eye_l.x; ly = eye_l.y;
+                rx = eye_r.x; ry = eye_r.y;
+            }
+            dizzy->setLeftRightPosition(lx, ly, rx, ry);
+            _dizzy_decorator_id = avatar.addDecorator(std::move(dizzy));
+
+            // Shy reuses head_pet config (cheek positions are the same
+            // semantic placement). Falls back to ShyDecorator defaults when
+            // the skin doesn't override.
+            auto shy = std::make_unique<avatar::ShyDecorator>(lv_screen_active(), 0);
+            const auto* hp_cfg = avatar.getHeadPetConfig();
+            if (hp_cfg && hp_cfg->has_shy) {
+                shy->setLeftRightPosition(hp_cfg->shy_left_x, hp_cfg->shy_left_y,
+                                          hp_cfg->shy_right_x, hp_cfg->shy_right_y);
+            }
+            _shy_decorator_id = avatar.addDecorator(std::move(shy));
         }
 
         // 刷新恢复时间和切换时间

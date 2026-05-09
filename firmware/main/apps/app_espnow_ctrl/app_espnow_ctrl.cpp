@@ -12,6 +12,7 @@
 #include <assets/assets.h>
 #include <smooth_lvgl.hpp>
 #include <stackchan/stackchan.h>
+#include <stackchan/avatar/skins/image/skin_loader.h>
 #include <apps/common/common.h>
 #include <cstdint>
 #include <mutex>
@@ -72,9 +73,11 @@ void AppEspnowControl::onOpen()
 
     auto& stackchan = GetStackChan();
 
-    auto avatar = std::make_unique<avatar::DefaultAvatar>();
-    avatar->init(lv_screen_active());
-    stackchan.attachAvatar(std::move(avatar));
+    auto skin = avatar::image::load_avatar_or_fallback(lv_screen_active());
+    stackchan.attachAvatar(std::move(skin.avatar));
+    if (!skin.error_message.empty()) {
+        view::pop_a_toast(skin.error_message, view::ToastType::Error, 12000);
+    }
 
     stackchan.clearModifiers();
     stackchan.addModifier(std::make_unique<BreathModifier>());
@@ -255,6 +258,7 @@ void AppEspnowControl::onClose()
 
     view::destroy_home_indicator();
     view::destroy_status_bar();
+    GetStackChan().resetAvatar();
 
     GetHAL().requestWarmReboot(2);
 }

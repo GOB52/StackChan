@@ -3,6 +3,7 @@
  *
  * SPDX-License-Identifier: MIT
  */
+// Modified by GOB (X:@GOB_52_GOB / GitHub:GOB52) - StackChan firmware fork
 #pragma once
 #include <memory>
 #include <cstdint>
@@ -13,8 +14,10 @@
 #include <uitk/short_namespace.hpp>
 #include <smooth_lvgl.hpp>
 #include <array>
+#include <vector>
 #include <lvgl_image.h>
 #include <string_view>
+#include <atomic>
 
 /**
  * @brief
@@ -48,6 +51,25 @@ enum class ImuMotionEvent {
     None = 0,
     Shake,
     PickUp,
+};
+
+/**
+ * @brief NFC tag detection event payload (GOB fork: M5Unit-NFC integration).
+ * UID + classified PICC type (no NDEF payload).
+ */
+struct NfcTagEvent_t {
+    std::string uid;   // hex string (e.g. "04A1B2C3D4E5F6")
+    std::string type;  // classified PICC type (e.g. "MIFARE Classic 1K")
+};
+
+/**
+ * @brief stackchan:cmd NDEF record received from a PICC (GOB fork).
+ * Payload is the raw bytes of an NDEF MIME record whose type string equals
+ * "application/vnd.stackchan.cmd+json" (RFC 6838 vendor tree).
+ */
+struct NfcCmdEvent_t {
+    std::string          uid;      // tag UID for logging / future idempotency
+    std::vector<uint8_t> payload;  // raw NDEF record payload bytes (UTF-8 JSON)
 };
 
 /**
@@ -128,13 +150,20 @@ public:
         _label_logo = std::make_unique<uitk::lvgl_cpp::Label>(_panel->get());
         _label_logo->setTextFont(&lv_font_montserrat_24);
         _label_logo->setTextColor(lv_color_hex(0xFFFFFF));
-        _label_logo->align(LV_ALIGN_CENTER, 0, -14);
+        _label_logo->align(LV_ALIGN_CENTER, 0, -28);
         _label_logo->setText("STACKCHAN");
+
+        // StackChan firmware fork - added by GOB (X:@GOB_52_GOB / GitHub:GOB52)
+        _label_subtitle = std::make_unique<uitk::lvgl_cpp::Label>(_panel->get());
+        _label_subtitle->setTextFont(&lv_font_montserrat_16);
+        _label_subtitle->setTextColor(lv_color_hex(0x4CAF50));
+        _label_subtitle->align(LV_ALIGN_CENTER, 0, -2);
+        _label_subtitle->setText("GOB fork");
 
         _label_msg = std::make_unique<uitk::lvgl_cpp::Label>(_panel->get());
         _label_msg->setTextFont(&lv_font_montserrat_16);
         _label_msg->setTextColor(lv_color_hex(0xBFBFBF));
-        _label_msg->align(LV_ALIGN_CENTER, 0, 14);
+        _label_msg->align(LV_ALIGN_CENTER, 0, 22);
         _label_msg->setText("Starting up ...");
 
         _label_version = std::make_unique<uitk::lvgl_cpp::Label>(_panel->get());
@@ -147,6 +176,7 @@ public:
 private:
     std::unique_ptr<uitk::lvgl_cpp::Container> _panel;
     std::unique_ptr<uitk::lvgl_cpp::Label> _label_logo;
+    std::unique_ptr<uitk::lvgl_cpp::Label> _label_subtitle;
     std::unique_ptr<uitk::lvgl_cpp::Label> _label_msg;
     std::unique_ptr<uitk::lvgl_cpp::Label> _label_version;
 };
@@ -231,11 +261,32 @@ public:
     /* ----------------------------------- IMU ---------------------------------- */
     uitk::Signal<ImuMotionEvent> onImuMotionEvent;
 
+    /* ----------------------------------- NFC ---------------------------------- */
+    // GOB fork: M5Unit-NFC tag detection. UID/type only.
+    uitk::Signal<const NfcTagEvent_t&> onNfcTagDetected;
+    // GOB fork: stackchan:cmd NDEF record received. Emitted once per matching
+    // External Type record on the tag; payload is raw bytes.
+    uitk::Signal<const NfcCmdEvent_t&> onNfcCmdReceived;
+    // Lazily initialize UnitNFC + start poll task. Called from the
+    // stackchan update task once xiaozhi is ready, so that the audio
+    // codec init (ES7210 / AW88298) gets the I2C bus first without
+    // contention from the NFC poll loop.
+    void startNfc();
+    // True while the NFC poll task is mid-iteration (detect / identify /
+    // NDEF read in progress). Other I2C consumers on a different core
+    // (notably the FT6336 touchpad esp_timer on core 0) check this and
+    // skip their poll cycle to avoid cross-core I2C contention.
+    static bool isNfcBusy();
+
     /* ---------------------------------- Time ---------------------------------- */
     void syncRtcTimeToSystem();
     void syncSystemTimeToRtc();
     void setTimezone(std::string_view tz);
     std::string getTimezone();
+    // Called from SNTP cb (tcpip_thread); sets pending flag, actual I2C/RTC write
+    // is deferred to main task via tickSntpRtcSyncIfPending() to avoid stack overflow.
+    void requestRtcSyncFromSntp();
+    void tickSntpRtcSyncIfPending();
 
     /* --------------------------------- EspNow --------------------------------- */
     uitk::Signal<const std::vector<uint8_t>&> onEspNowData;
@@ -275,6 +326,7 @@ public:
 
 private:
     bool _xiaozhi_start_requested = false;
+    std::atomic<bool> _rtc_sync_pending{false};
 
     void xiaozhi_board_init();
     void lvgl_init();
@@ -284,6 +336,7 @@ private:
     void head_touch_init();
     void io_expander_init();
     void imu_init();
+    void nfc_init();  // GOB fork: M5Unit-NFC
     void rtc_init();
 };
 

@@ -24,12 +24,28 @@ public:
         std::vector<MenuItem> items;
     };
 
-    SelectMenuPage(std::vector<MenuSection> sections);
+    // Optional color theme. Defaults preserve the original blue palette so
+    // existing callers (AppSetup) need no change. AppGobFork passes a green theme.
+    struct Colors {
+        uint32_t panel_bg;
+        uint32_t section_text;
+        uint32_t btn_bg;
+        uint32_t btn_text;
+    };
+    static constexpr Colors DEFAULT_COLORS{0xEDF4FF, 0x6A6882, 0xB8D3FD, 0x26206A};
+
+    SelectMenuPage(std::vector<MenuSection> sections, Colors colors = DEFAULT_COLORS);
 
     void update();
 
+    // GOB fork: scroll position get/set so callers can preserve the user's
+    // place across menu rebuilds (e.g. after a toggle that just edits a label).
+    int  getScrollY() const;
+    void setScrollY(const int y);
+
 private:
     std::vector<MenuSection> _sections;
+    Colors _colors;
     std::unique_ptr<uitk::lvgl_cpp::Container> _pannel;
     std::vector<std::unique_ptr<uitk::lvgl_cpp::Label>> _labels;
     std::vector<std::unique_ptr<uitk::lvgl_cpp::Button>> _buttons;

@@ -311,11 +311,15 @@ idf_component_register(SRCS ${SOURCES}
                         efuse
                         bt
                         fatfs
+                        sdmmc
                         ArduinoJson
                         esp-now
                         mooncake
                         mooncake_log
                         smooth_ui_toolkit
+                        # GOB fork: M5UnitUnified ESP-IDF native + M5Unit-NFC
+                        M5UnitUnified
+                        M5Unit-NFC
                     )
 
 # Use target_compile_definitions to define BOARD_TYPE, BOARD_NAME

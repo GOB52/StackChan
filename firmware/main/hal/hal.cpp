@@ -3,7 +3,10 @@
  *
  * SPDX-License-Identifier: MIT
  */
+// Modified by GOB (X:@GOB_52_GOB / GitHub:GOB52) - StackChan firmware fork
 #include "hal.h"
+#include "board/sd_guard.h"
+#include "../stackchan/nfc/nfc_cmd_dispatcher.h"
 #include <memory>
 #include <mooncake_log.h>
 #include <nvs_flash.h>
@@ -33,11 +36,20 @@ void Hal::init()
     ESP_ERROR_CHECK(ret);
 
     xiaozhi_board_init();
+    // GOB fork: handshake with SD card immediately after board init so its SPI
+    // state machine is in a defined state (CS=HIGH → tristate). Without this,
+    // some SD cards drive MISO randomly until first SPI exchange, corrupting
+    // LCD writes via the shared GPIO35 (LCD_DC / SD_MISO) — visible as screen
+    // tearing during launcher swipe right after boot.
+    stackchan::hal::SdGuard::performEarlyProbe();
     xiaozhi_mcp_init();
     head_touch_init();
     io_expander_init();
     rtc_init();
     imu_init();
+    // NFC は xiaozhi audio codec init (ES7210/AW88298) と I2C bus を
+    // 共有するため、ここでは初期化しない。xiaozhi 起動完了後に
+    // _stackchan_update_task から startNfc() で遅延初期化する。
     servo_init();
     lvgl_init();
 }
@@ -118,6 +130,7 @@ static void _confirm_ota_image_if_stable()
 void Hal::updateHeapStatusLog()
 {
     _confirm_ota_image_if_stable();
+    tickSntpRtcSyncIfPending();
 
     static uint32_t last_log_tick = 0;
     if (millis() - last_log_tick < 10000) {
@@ -125,6 +138,18 @@ void Hal::updateHeapStatusLog()
     }
     last_log_tick = millis();
     SystemInfo::PrintHeapStats();
+}
+
+void Hal::requestRtcSyncFromSntp()
+{
+    _rtc_sync_pending.store(true, std::memory_order_release);
+}
+
+void Hal::tickSntpRtcSyncIfPending()
+{
+    if (_rtc_sync_pending.exchange(false, std::memory_order_acq_rel)) {
+        syncSystemTimeToRtc();
+    }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -166,6 +191,11 @@ static void _stackchan_update_task(void* param)
             GetHAL().startSntp();
             view::create_home_indicator([]() { GetHAL().requestWarmReboot(0); }, 0x81DBBD, 0x134233);
             view::create_status_bar(0x81DBBD, 0x134233);
+            // GOB fork: NFC を遅延初期化 (audio codec init を妨げないため)
+            GetHAL().startNfc();
+            // GOB fork: stackchan:cmd dispatcher を起動。NFC opt-out 時でも
+            // 害はない (signal が emit されないだけ) ので無条件で初期化。
+            stackchan::nfc::CmdDispatcher::initOnce();
             is_setup_done = true;
         }
 
