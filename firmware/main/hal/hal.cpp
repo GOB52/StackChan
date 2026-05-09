@@ -169,20 +169,22 @@ void Hal::xiaozhi_board_init()
 
 static void _stackchan_update_task(void* param)
 {
-    bool is_xiaozhi_ready = false;
-    bool is_setup_done    = false;
+    bool is_setup_done = false;
 
     while (1) {
-        vTaskDelay(pdMS_TO_TICKS(10));
+        vTaskDelay(pdMS_TO_TICKS(20));
 
         tools::update_reminders();
 
         LvglLockGuard lock;
 
+        if (!hal_bridge::is_xiaozhi_idle()) {
+            vTaskDelay(pdMS_TO_TICKS(100));
+        }
+
         GetStackChan().update();
 
-        if (!is_xiaozhi_ready) {
-            is_xiaozhi_ready = hal_bridge::is_xiaozhi_ready();
+        if (!hal_bridge::is_xiaozhi_ready()) {
             continue;
         }
 
@@ -225,9 +227,26 @@ void Hal::startXiaozhi()
     });
 
     // Start stackchan update task
-    xTaskCreatePinnedToCore(_stackchan_update_task, "stackchan", 4096, NULL, 5, NULL, 1);
+    xTaskCreatePinnedToCore(_stackchan_update_task, "stackchan", 4096, NULL, 3, NULL, 1);
 
     hal_bridge::start_xiaozhi_app();
+}
+
+XiaozhiConfig_t Hal::getXiaozhiConfig()
+{
+    auto bridge_config = hal_bridge::get_xiaozhi_config();
+    return XiaozhiConfig_t{
+        .idleShutdownTimeSeconds   = bridge_config.idleShutdownTimeSeconds,
+        .allowShutdownWhenCharging = bridge_config.allowShutdownWhenCharging,
+    };
+}
+
+void Hal::setXiaozhiConfig(XiaozhiConfig_t config)
+{
+    hal_bridge::set_xiaozhi_config({
+        .idleShutdownTimeSeconds   = config.idleShutdownTimeSeconds,
+        .allowShutdownWhenCharging = config.allowShutdownWhenCharging,
+    });
 }
 
 uint8_t Hal::getBatteryLevel()

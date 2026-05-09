@@ -16,6 +16,7 @@
 #include <esp_lcd_panel_ops.h>
 #include <esp_lcd_ili9341.h>
 #include <esp_timer.h>
+#include <algorithm>
 #include "stackchan_camera.h"
 #include "hal_bridge.h"
 #include "sd_guard.h"
@@ -120,6 +121,17 @@ public:
         WriteReg(XPOWERS_AXP2101_ICC_CHG_SET, val | opt);
         return true;
     }
+
+    bool IsExternalPowerConnected()
+    {
+        const uint8_t power_status      = ReadReg(0x01);
+        const uint8_t current_direction = (power_status & 0b01100000) >> 5;
+        const bool is_charging_done     = (power_status & 0b00000111) == 0b00000100;
+
+        // Treat any non-discharging state as externally powered so a plugged-in cable
+        // still counts even after the battery is full.
+        return current_direction != 2 || is_charging_done;
+    }
 };
 
 class CustomBacklight : public Backlight {
@@ -200,12 +212,29 @@ public:
         delete[] read_buffer_;
     }
 
-    void UpdateTouchPoint()
+    bool UpdateTouchPoint()
     {
-        ReadRegs(0x02, read_buffer_, 6);
-        tp_.num = read_buffer_[0] & 0x0F;
-        tp_.x   = ((read_buffer_[1] & 0x0F) << 8) | read_buffer_[2];
-        tp_.y   = ((read_buffer_[3] & 0x0F) << 8) | read_buffer_[4];
+        auto err = TryReadRegs(0x02, read_buffer_, 6);
+        if (err != ESP_OK) {
+            tp_.num = 0;
+            tp_.x   = -1;
+            tp_.y   = -1;
+
+            consecutive_failures_++;
+            int64_t now_us = esp_timer_get_time();
+            if (last_error_log_us_ == 0 || (now_us - last_error_log_us_) >= 1000 * 1000) {
+                ESP_LOGW(TAG, "FT6336 read failed (%s), skipped %lu sample(s)", esp_err_to_name(err),
+                         static_cast<unsigned long>(consecutive_failures_));
+                last_error_log_us_ = now_us;
+            }
+            return false;
+        }
+
+        consecutive_failures_ = 0;
+        tp_.num               = read_buffer_[0] & 0x0F;
+        tp_.x                 = ((read_buffer_[1] & 0x0F) << 8) | read_buffer_[2];
+        tp_.y                 = ((read_buffer_[3] & 0x0F) << 8) | read_buffer_[4];
+        return true;
     }
 
     inline const TouchPoint_t& GetTouchPoint()
@@ -216,10 +245,15 @@ public:
 private:
     uint8_t* read_buffer_ = nullptr;
     TouchPoint_t tp_;
+    int64_t last_error_log_us_     = 0;
+    uint32_t consecutive_failures_ = 0;
 };
 
 class M5StackCoreS3Board : public WifiBoard {
 private:
+    static constexpr int kPowerSaveSleepDelaySeconds = 300;
+    static constexpr int kPowerStatePollIntervalMs   = 1000;
+
     i2c_master_bus_handle_t i2c_bus_;
     Pmic* pmic_;
     Aw9523* aw9523_;
@@ -228,10 +262,55 @@ private:
     StackChanCamera* camera_;
     esp_timer_handle_t touchpad_timer_;
     PowerSaveTimer* power_save_timer_;
+    hal_bridge::XiaozhiConfig_t xiaozhi_config_;
+    bool last_power_save_enabled_      = false;
+    int64_t last_power_state_check_ms_ = 0;
+
+    bool ShouldEnablePowerSave(bool has_external_power, bool is_discharging) const
+    {
+        return is_discharging || (has_external_power && xiaozhi_config_.allowShutdownWhenCharging);
+    }
+
+    void UpdatePowerSaveEnabled(bool has_external_power, bool is_discharging)
+    {
+        const bool should_enable_power_save = ShouldEnablePowerSave(has_external_power, is_discharging);
+        if (should_enable_power_save == last_power_save_enabled_) {
+            return;
+        }
+
+        ESP_LOGI(TAG, "Power save timer %s: external_power=%d, discharging=%d, allowShutdownWhenCharging=%d",
+                 should_enable_power_save ? "enabled" : "disabled", has_external_power, is_discharging,
+                 xiaozhi_config_.allowShutdownWhenCharging);
+        power_save_timer_->SetEnabled(should_enable_power_save);
+        last_power_save_enabled_ = should_enable_power_save;
+    }
+
+    void PollPowerSaveState()
+    {
+        const int64_t now_ms = esp_timer_get_time() / 1000;
+        if (last_power_state_check_ms_ != 0 && (now_ms - last_power_state_check_ms_) < kPowerStatePollIntervalMs) {
+            return;
+        }
+        last_power_state_check_ms_ = now_ms;
+
+        UpdatePowerSaveEnabled(pmic_->IsExternalPowerConnected(), pmic_->IsDischarging());
+    }
 
     void InitializePowerSaveTimer()
     {
-        power_save_timer_ = new PowerSaveTimer(-1, 300, 600);
+        xiaozhi_config_ = hal_bridge::get_xiaozhi_config();
+
+        const int seconds_to_shutdown = xiaozhi_config_.idleShutdownTimeSeconds > 0
+                                            ? static_cast<int>(xiaozhi_config_.idleShutdownTimeSeconds)
+                                            : -1;
+        const int seconds_to_sleep    = seconds_to_shutdown == -1
+                                            ? kPowerSaveSleepDelaySeconds
+                                            : std::min(kPowerSaveSleepDelaySeconds, seconds_to_shutdown);
+
+        ESP_LOGI(TAG, "Init power save timer: sleep=%d s, shutdown=%d s, allow_shutdown_when_charging=%d",
+                 seconds_to_sleep, seconds_to_shutdown, xiaozhi_config_.allowShutdownWhenCharging);
+
+        power_save_timer_ = new PowerSaveTimer(-1, seconds_to_sleep, seconds_to_shutdown);
         power_save_timer_->OnEnterSleepMode([this]() {
             GetDisplay()->SetPowerSaveMode(true);
             // GetBacklight()->SetBrightness(10);
@@ -241,7 +320,7 @@ private:
             GetBacklight()->RestoreBrightness();
         });
         power_save_timer_->OnShutdownRequest([this]() { pmic_->PowerOff(); });
-        power_save_timer_->SetEnabled(true);
+        UpdatePowerSaveEnabled(pmic_->IsExternalPowerConnected(), pmic_->IsDischarging());
     }
 
     void InitializeI2c()
@@ -300,7 +379,9 @@ private:
 
     void PollTouchpad()
     {
-        ft6336_->UpdateTouchPoint();
+        if (!ft6336_->UpdateTouchPoint()) {
+            return;
+        }
         auto& touch_point = ft6336_->GetTouchPoint();
 
         // Update hal touch point
@@ -326,6 +407,7 @@ private:
                     if (Hal::isNfcBusy()) return;
                     M5StackCoreS3Board* board = (M5StackCoreS3Board*)arg;
                     board->PollTouchpad();
+                    board->PollPowerSaveState();
                 },
             .arg                   = this,
             .dispatch_method       = ESP_TIMER_TASK,
@@ -451,9 +533,9 @@ private:
 public:
     M5StackCoreS3Board()
     {
-        InitializePowerSaveTimer();
         InitializeI2c();
         InitializeAxp2101();
+        InitializePowerSaveTimer();
         InitializeAw9523();
         I2cDetect();
         InitializeSpi();

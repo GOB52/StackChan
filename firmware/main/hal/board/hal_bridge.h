@@ -5,6 +5,7 @@
  */
 #pragma once
 #include "stackchan_camera.h"
+#include <cstdint>
 #include <lvgl.h>
 #include <driver/i2c_master.h>
 #include <string_view>
@@ -21,6 +22,11 @@ struct Data_t {
     TouchPoint_t touchPoint;
     bool isXiaozhiMode              = false;
     bool isXiaozhiModeToggleEnabled = false;
+};
+
+struct XiaozhiConfig_t {
+    uint32_t idleShutdownTimeSeconds = 600;
+    bool allowShutdownWhenCharging   = false;
 };
 
 void lock();
@@ -41,6 +47,9 @@ lv_disp_t* display_get_lvgl_display();
 void xiaozhi_board_init();
 void start_xiaozhi_app();
 bool is_xiaozhi_ready();
+bool is_xiaozhi_idle();
+XiaozhiConfig_t get_xiaozhi_config();
+void set_xiaozhi_config(const XiaozhiConfig_t& config);
 
 // True while xiaozhi DeviceState == kDeviceStateSpeaking (TTS active).
 // Used to suppress NFC dispatch chime so the notification sound doesn't

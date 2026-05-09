@@ -190,8 +190,10 @@ void TimezoneWorker::update()
     }
 }
 
-FactoryResetWorker::FactoryResetWorker()
+FactoryResetWorker::FactoryResetWorker(std::function<void()> beforeResetAction)
 {
+    _before_reset_action = std::move(beforeResetAction);
+
     _panel = std::make_unique<uitk::lvgl_cpp::Container>(lv_screen_active());
     _panel->setPadding(0, 0, 0, 0);
     _panel->setBgColor(lv_color_hex(0xEDF4FF));
@@ -260,6 +262,10 @@ void FactoryResetWorker::update()
 
             _label_info->setText("Factory Resetting...\nDo not turn off power.");
             _label_info->align(LV_ALIGN_CENTER, 0, 0);
+
+            if (_before_reset_action) {
+                _before_reset_action();
+            }
 
             GetHAL().lvglUnlock();
             GetHAL().delay(200);

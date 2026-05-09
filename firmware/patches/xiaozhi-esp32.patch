@@ -246,23 +246,28 @@ index 3692e0c..7bfbc5c 100644
      // Strategy instance
      std::unique_ptr<AssetStrategy> strategy_;
 diff --git a/main/boards/common/i2c_device.cc b/main/boards/common/i2c_device.cc
-index 835997d..772e965 100644
+index 835997d..ea50d51 100644
 --- a/main/boards/common/i2c_device.cc
 +++ b/main/boards/common/i2c_device.cc
-@@ -21,15 +21,24 @@ I2cDevice::I2cDevice(i2c_master_bus_handle_t i2c_bus, uint8_t addr) {
- 
+@@ -21,15 +21,35 @@ I2cDevice::I2cDevice(i2c_master_bus_handle_t i2c_bus, uint8_t addr) {
+
  void I2cDevice::WriteReg(uint8_t reg, uint8_t value) {
      uint8_t buffer[2] = {reg, value};
 -    ESP_ERROR_CHECK(i2c_master_transmit(i2c_device_, buffer, 2, 100));
++    // GOB fork: replace ESP_ERROR_CHECK with ESP_LOGW (NFC bus contention 対策).
++    // ESP_ERROR_CHECK(i2c_master_transmit(i2c_device_, buffer, 2, 100));
 +    esp_err_t err = i2c_master_transmit(i2c_device_, buffer, 2, 500);
 +    if (err != ESP_OK) {
 +        ESP_LOGW(TAG, "WriteReg(0x%02x)=0x%02x failed: %s", reg, value, esp_err_to_name(err));
 +    }
  }
- 
+
  uint8_t I2cDevice::ReadReg(uint8_t reg) {
 -    uint8_t buffer[1];
 -    ESP_ERROR_CHECK(i2c_master_transmit_receive(i2c_device_, &reg, 1, buffer, 1, 100));
++    // GOB fork: same NFC contention 対策.
++    // uint8_t buffer[1];
++    // ESP_ERROR_CHECK(i2c_master_transmit_receive(i2c_device_, &reg, 1, buffer, 1, 100));
 +    uint8_t buffer[1] = {0};
 +    esp_err_t err = i2c_master_transmit_receive(i2c_device_, &reg, 1, buffer, 1, 500);
 +    if (err != ESP_OK) {
@@ -270,12 +275,30 @@ index 835997d..772e965 100644
 +    }
      return buffer[0];
  }
- 
+
  void I2cDevice::ReadRegs(uint8_t reg, uint8_t* buffer, size_t length) {
 -    ESP_ERROR_CHECK(i2c_master_transmit_receive(i2c_device_, &reg, 1, buffer, length, 100));
++    // GOB fork: same NFC contention 対策.
++    // ESP_ERROR_CHECK(i2c_master_transmit_receive(i2c_device_, &reg, 1, buffer, length, 100));
 +    esp_err_t err = i2c_master_transmit_receive(i2c_device_, &reg, 1, buffer, length, 500);
 +    if (err != ESP_OK) {
 +        ESP_LOGW(TAG, "ReadRegs(0x%02x, len=%u) failed: %s", reg, (unsigned)length, esp_err_to_name(err));
 +    }
++}
++
++esp_err_t I2cDevice::TryReadRegs(uint8_t reg, uint8_t* buffer, size_t length, int timeout_ms) {
++    return i2c_master_transmit_receive(i2c_device_, &reg, 1, buffer, length, timeout_ms);
  }
 \ No newline at end of file
+diff --git a/main/boards/common/i2c_device.h b/main/boards/common/i2c_device.h
+index 7bc917b..874b137 100644
+--- a/main/boards/common/i2c_device.h
++++ b/main/boards/common/i2c_device.h
+@@ -13,6 +13,7 @@ protected:
+     void WriteReg(uint8_t reg, uint8_t value);
+     uint8_t ReadReg(uint8_t reg);
+     void ReadRegs(uint8_t reg, uint8_t* buffer, size_t length);
++    esp_err_t TryReadRegs(uint8_t reg, uint8_t* buffer, size_t length, int timeout_ms = 100);
+ };
+
+ #endif // I2C_DEVICE_H

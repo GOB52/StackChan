@@ -5,6 +5,7 @@
  */
 #include "hal.h"
 #include <mooncake_log.h>
+#include <cstdio>
 #include <memory>
 #include <ota.h>
 
@@ -45,11 +46,19 @@ bool Hal::updateFirmware(std::function<void(std::string_view)> onLog)
     }
 
     onLog("Starting firmware upgrade...");
-    bool upgrade_success = Ota::Upgrade(firmware_url, [&](int progress, size_t speed) {
-        auto msg = fmt::format("Upgrading firmware: {}% at {}KB/s", progress, speed / 1024);
-        mclog::tagInfo(_tag, "upgrade progress: {}", msg);
+    int last_reported_progress = -1;
+    bool upgrade_success       = Ota::Upgrade(firmware_url, [&](int progress, size_t speed) {
+        if (progress == last_reported_progress) {
+            return;
+        }
+
+        last_reported_progress = progress;
+
+        char msg[48];
+        std::snprintf(msg, sizeof(msg), "Upgrading firmware: %d%% at %uKB/s", progress,
+                            static_cast<unsigned>(speed / 1024));
         onLog(msg);
-    });
+          });
 
     if (!upgrade_success) {
         mclog::tagError(_tag, "firmware upgrade failed: version={}, url={}", firmware_version, firmware_url);

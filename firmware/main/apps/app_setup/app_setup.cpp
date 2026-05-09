@@ -71,6 +71,15 @@ void AppSetup::onOpen()
               }}},
         },
         {
+            "AI.Agent",
+            {{"Power Saving",
+              [&]() {
+                  _destroy_menu    = true;
+                  _need_warm_reset = true;
+                  _worker          = std::make_unique<XiaozhiPowerSavingWorker>();
+              }}},
+        },
+        {
             "Hardware Test",
             {{"Servo",
               [&]() {
