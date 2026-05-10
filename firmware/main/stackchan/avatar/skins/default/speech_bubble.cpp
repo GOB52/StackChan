@@ -187,10 +187,15 @@ void DefaultSpeechBubble::renderAndPosition(size_t animated_chars)
     lv_anim_delete(label_obj, _anim_set_x_cb);
 
     // GOB fork: 親変更直後 (renderAsVanilla → renderAndPosition 遷移) は
-    // lv_obj_get_x が前 anchor (CENTER) の左端値を返すため、anim を起動すると
-    // cur=−40 → target=0 のような「右へ徐々にスライド」が見えてしまう。
-    // 親変更時は anim をスキップして target_x へ即 snap し、視覚的ジャンプを回避。
-    if (parent_changed || animated_chars == 0) {
+    // lv_obj_get_x が前 anchor (CENTER) の左端値を返したままだと anim が
+    // cur=−40 → target=0 のような誤った遷移を見せてしまう。
+    // layout を即時更新して新 anchor (LEFT_MID) 基準の cur_x (= 0) を反映してから
+    // anim を起動することで、滑らかな tail-follow を維持しつつジャンプも回避する。
+    if (parent_changed) {
+        lv_obj_update_layout(label_obj);
+    }
+
+    if (animated_chars == 0) {
         lv_obj_set_x(label_obj, target_x);
         _label_x_logical = target_x;
         // GOB fork: 非アニメーションでは即「描画完了」扱い。dismiss が pending なら arm。
