@@ -302,3 +302,24 @@ index 7bc917b..874b137 100644
  };
 
  #endif // I2C_DEVICE_H
+diff --git a/main/ota.cc b/main/ota.cc
+index abcdef0..1234567 100644
+--- a/main/ota.cc
++++ b/main/ota.cc
+@@ -196,10 +196,12 @@ bool Ota::ParseConfig(...)
+             struct timeval tv;
+             double ts = timestamp->valuedouble;
+             
+-            // 如果有时区偏移，计算本地时间
+-            if (cJSON_IsNumber(timezone_offset)) {
+-                ts += (timezone_offset->valueint * 60 * 1000); // 转换分钟为毫秒
+-            }
++            // GOB fork: timezone_offset 加算を撤去。POSIX では system_clock は
++            // UTC を保持するべき (TZ 変換は localtime_r/gmtime_r 等が行う)。
++            // 元コードは server から来る UTC ms に offset を加算して "JST as if
++            // UTC" を settimeofday に渡しており、TZ=JST-9 環境下では localtime_r
++            // が更に +9h 加算 → status_bar 表示が +9h ずれる問題があった (実機確認)。
++            (void)timezone_offset;
+             
+             tv.tv_sec = (time_t)(ts / 1000);  // 转换毫秒为秒
+             tv.tv_usec = (suseconds_t)((long long)ts % 1000) * 1000;  // 剩余的毫秒转换为微秒
