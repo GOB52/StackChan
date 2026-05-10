@@ -179,8 +179,9 @@ static void _stackchan_update_task(void* param)
 
         LvglLockGuard lock;
 
-        // GOB fork: upstream v1.2.6 の "non-idle 時 100ms delay" を 33ms に短縮。
-        // 条件は upstream のまま (!is_xiaozhi_idle) を維持。
+        // GOB fork: speaking 中は upstream 互換 100ms に戻す (audio プチノイズ対策)。
+        // それ以外の non-idle (listening / connecting 等) は 33ms を維持し、
+        // servo motion / status bar の smoothness を確保する。
         //
         // 経緯 (実機試行ログ):
         //  - 0ms (撤去)                   → speaking 中 audio プチノイズ発生
@@ -189,11 +190,12 @@ static void _stackchan_update_task(void* param)
         //                                   (audio_input の AEC FFT が CPU 0 食い切り)
         //  - speaking 限定 10ms           → IDLE1 (CPU 1) watchdog
         //                                   (stackchan_update_task が CPU 1 食い切り)
-        // 着地: 全 non-idle state で 33ms。実効 ~19Hz、speaking を含む全 state で
-        // audio task に CPU を譲る間隔を確保。listening 中の servo motion は
-        // upstream の 9Hz よりは改善 (19Hz)。完全な smoothness は servo update
-        // を専用 high-priority task に分離する必要あり (将来検討)。
-        if (!hal_bridge::is_xiaozhi_idle()) {
+        //  - 全 non-idle 33ms             → FX OFF (SCROLL_CIRCULAR 連続 refresh) と
+        //                                   重なるとプチノイズ顕著
+        // 現状: speaking のみ 100ms (upstream 準拠)、他 non-idle 33ms。
+        if (hal_bridge::is_xiaozhi_speaking()) {
+            vTaskDelay(pdMS_TO_TICKS(100));
+        } else if (!hal_bridge::is_xiaozhi_idle()) {
             vTaskDelay(pdMS_TO_TICKS(33));
         }
 
