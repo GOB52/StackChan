@@ -289,6 +289,14 @@ public:
     // skip their poll cycle to avoid cross-core I2C contention.
     static bool isNfcBusy();
 
+    // True while the audio codec (ES7210/AW88298 on the shared I2C bus) is
+    // mid-initialization (esp_codec_dev_open). FT6336 touchpad esp_timer
+    // checks this and skips its 20ms poll to avoid corrupting ES7210's
+    // critical register transactions, which manifest as
+    // ESP_ERR_NOT_SUPPORTED → abort otherwise (race confirmed in logs).
+    static bool isAudioInitBusy();
+    static void setAudioInitBusy(bool busy);
+
     /* ---------------------------------- Time ---------------------------------- */
     void syncRtcTimeToSystem();
     void syncSystemTimeToRtc();

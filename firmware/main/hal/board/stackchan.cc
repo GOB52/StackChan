@@ -405,6 +405,11 @@ private:
                     // bus stuck (ESP_ERR_INVALID_STATE) → reboot に至るため、
                     // この 1 周期 (20ms) を諦めることで安全側に倒す。
                     if (Hal::isNfcBusy()) return;
+                    // GOB fork: ES7210/AW88298 codec init (esp_codec_dev_open)
+                    // 中も同様に skip。約 120ms 続く I2C register 集中アクセス
+                    // 中に touchpad poll が割り込むと critical transaction が
+                    // ESP_ERR_NOT_SUPPORTED で abort することがあるため。
+                    if (Hal::isAudioInitBusy()) return;
                     M5StackCoreS3Board* board = (M5StackCoreS3Board*)arg;
                     board->PollTouchpad();
                     board->PollPowerSaveState();
