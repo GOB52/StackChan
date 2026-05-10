@@ -461,8 +461,6 @@ void StackChanAvatarDisplay::SetChatMessage(const char* role, const char* conten
         return;
     }
 
-    // ESP_LOGE(TAG, "SetChatMessage: role=%s, content=%s", role ? role : "null", content ? content : "null");
-
     DisplayLockGuard lock(this);
 
     if (strcmp(role, "system") == 0) {
@@ -535,6 +533,14 @@ void StackChanAvatarDisplay::dispatchNextSegmentLocked()
         if (segment_timer_) {
             lv_timer_set_repeat_count(segment_timer_, 1);
         }
+    } else if (!hal_bridge::is_xiaozhi_speaking() && stackchan.hasAvatar()) {
+        // GOB fork: speaking → listening に既に遷移した後で遅延 chunk が dispatch
+        // される (tool 同期実行による Application タスク block の余波) と、
+        // appendSpeech 冒頭の cancelDismissTimer で SetStatus(LISTENING) 時に
+        // arm した dismiss timer が解除されてしまう。queue を消化し終わった
+        // 時点で speaking でなければ dismiss を再 arm して bubble が残るのを
+        // 防ぐ。
+        stackchan.avatar().requestSpeechDismissAfterRender(3000);
     }
 }
 
