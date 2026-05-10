@@ -7,6 +7,7 @@
 #include <stackchan/stackchan.h>
 #include <stackchan/avatar/skins/image/skin_loader.h>
 #include <stackchan/gob_fork_nvs.h>
+#include <stackchan/gob_fork/error_toast.h>
 #include <hal/board/sd_guard.h>
 #include <apps/common/common.h>
 
@@ -214,6 +215,21 @@ void AppGobFork::build_main_menu()
                          return;
                      }
                      mclog::tagInfo(getAppInfo().name, "Bubble FX -> {}",
+                                    new_state ? "ON" : "OFF");
+                     // 即時反映 (再起動不要)。Main page 再描画で label 更新。
+                     _switch_pending = true;
+                     _pending_page   = Page::Main;
+                 }},
+                {std::string("Error Toast: ") +
+                     (stackchan::gob_fork::get_error_toast_enabled() ? "ON" : "OFF"),
+                 [&]() {
+                     const bool new_state = !stackchan::gob_fork::get_error_toast_enabled();
+                     if (!stackchan::gob_fork::set_error_toast_enabled(new_state)) {
+                         view::pop_a_toast("NVS save failed", view::ToastType::Error, 2000);
+                         return;
+                     }
+                     stackchan::gob_fork::error_toast::refresh_enabled_from_nvs();
+                     mclog::tagInfo(getAppInfo().name, "Error Toast -> {}",
                                     new_state ? "ON" : "OFF");
                      // 即時反映 (再起動不要)。Main page 再描画で label 更新。
                      _switch_pending = true;
