@@ -20,6 +20,7 @@
 #include <stackchan/stackchan.h>
 #include <stackchan/avatar/skins/image/skin_loader.h>
 #include <stackchan/gob_fork_nvs.h>
+#include <stackchan/gob_fork/utf8_helper.h>
 #include <assets/lang_config.h>
 #include <hal/hal.h>
 
@@ -30,26 +31,7 @@ using namespace stackchan::avatar;
 
 namespace {
 
-// GOB fork: UTF-8 1 char のバイト長を返す。lead byte の上位ビットで判定。
-size_t utf8_char_len(const unsigned char c)
-{
-    if ((c & 0x80) == 0x00) return 1;       // ASCII
-    if ((c & 0xE0) == 0xC0) return 2;       // 2-byte
-    if ((c & 0xF0) == 0xE0) return 3;       // 3-byte (CJK の大半)
-    if ((c & 0xF8) == 0xF0) return 4;       // 4-byte
-    return 1;                                // 不正バイト: 1 として進める
-}
-
-// GOB fork: UTF-8 文字列の char (= code point) 数。pacing 用。
-size_t utf8_char_count(std::string_view s)
-{
-    size_t count = 0;
-    for (size_t i = 0; i < s.size(); ) {
-        i += utf8_char_len(static_cast<unsigned char>(s[i]));
-        count++;
-    }
-    return count;
-}
+namespace utf8 = ::stackchan::gob_fork::utf8;
 
 // GOB fork: 句読点判定 (CJK 全角 + ASCII)。これらの文字直後で segment を切る。
 bool is_segment_delimiter(std::string_view ch)
@@ -70,7 +52,7 @@ std::vector<std::string> split_to_fragments(std::string_view text)
     std::vector<std::string> fragments;
     std::string current;
     for (size_t i = 0; i < text.size(); ) {
-        const size_t len = utf8_char_len(static_cast<unsigned char>(text[i]));
+        const size_t len = utf8::char_len(static_cast<unsigned char>(text[i]));
         const std::string_view ch = text.substr(i, len);
         current.append(ch);
         i += len;
@@ -105,7 +87,7 @@ std::vector<std::string> smart_split(std::string_view text)
     size_t current_chars = 0;
 
     for (auto& frag : fragments) {
-        const size_t frag_chars = utf8_char_count(frag);
+        const size_t frag_chars = utf8::char_count(frag);
         if (current.empty()) {
             current        = std::move(frag);
             current_chars  = frag_chars;
@@ -547,7 +529,7 @@ void StackChanAvatarDisplay::dispatchNextSegmentLocked()
     if (!segment_queue_.empty()) {
         // 次 segment までの delay = 表示中 segment の字数 × 200ms (TTS rate ~5 chars/sec)
         // 最低 200ms (1 文字以下でも間を取る)
-        const uint32_t chars = static_cast<uint32_t>(utf8_char_count(seg));
+        const uint32_t chars = static_cast<uint32_t>(utf8::char_count(seg));
         const uint32_t delay_ms = std::max<uint32_t>(200u, chars * 200u);
         segment_timer_ = lv_timer_create(&StackChanAvatarDisplay::onSegmentTimer, delay_ms, this);
         if (segment_timer_) {
