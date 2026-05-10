@@ -169,6 +169,23 @@ public:
         }
     }
 
+    // GOB fork: 連続 chunk を accumulate して tail-follow scroll させる。
+    // xiaozhi の SetChatMessage("assistant", ...) で利用。
+    void appendSpeech(std::string_view text)
+    {
+        if (getKeyElements().speechBubble) {
+            getKeyElements().speechBubble->appendSpeech(text);
+        }
+    }
+
+    // GOB fork: TTS 終了後の bubble dismiss リクエスト (slide 完了 + delay_ms 後)。
+    void requestSpeechDismissAfterRender(uint32_t delay_ms)
+    {
+        if (getKeyElements().speechBubble) {
+            getKeyElements().speechBubble->requestDismissAfterRender(delay_ms);
+        }
+    }
+
     void clearSpeech()
     {
         if (getKeyElements().speechBubble) {
