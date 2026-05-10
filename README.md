@@ -1,5 +1,37 @@
 # StackChan GOB fork
 
+## このフォークで追加された主な機能 / Highlights
+
+### 1. Image-based Avatar (PNG スキン)
+SD カードに置いた PNG セットでアバターを差替できます。複数スキンを切替可能で、選択は NVS に永続化されます。Emotion ごとの装飾 (Heart / Shy / Dizzy / Sleepy / Doubt) や HeadPet 演出にも対応。詳細は [Avatar.md](Avatar.md) を参照。
+
+### 2. NFC タグ連携
+M5Unit-NFC を opt-in で接続でき、`stackchan:cmd` MIME を持つ NDEF タグから JSON コマンドを発火できます (head 動作 / dance / emotion 切替 等)。**使用前に GOB FORK menu → NFC を ON にして再起動** する必要があります (デフォルト OFF、AI Agent 中の audio 安定性への影響を避けるため)。詳細は [NFC.md](NFC.md) を参照。
+
+### 3. GOB FORK ランチャーアプリ
+launcher 画面に専用 app を追加し、Skin Browser / SD Card Info / System Info / Screensaver 設定 / About を一括管理できます。
+
+### 4. ステータスバー強化
+12H / 24H 切替、TZ 設定 (NVS 永続化)、SNTP 同期に対応。
+
+---
+
+## Highlights of this fork  *(English)*
+
+### 1. Image-based avatar (PNG skin)
+Swap the avatar with a PNG set placed on the SD card. Multi-skin selection is persisted in NVS. Per-emotion decorators (Heart / Shy / Dizzy / Sleepy / Doubt) and the HeadPet animation are supported. See [Avatar.md](Avatar.md) for details.
+
+### 2. NFC tag integration
+Optional M5Unit-NFC support: NDEF tags with the `stackchan:cmd` MIME type trigger JSON commands (head motion / dance / emotion switch, etc.). **Before use, enable NFC via the GOB FORK menu and reboot** (off by default to keep AI Agent audio stable). See [NFC.md](NFC.md) for details.
+
+### 3. GOB FORK launcher app
+Adds a dedicated app to the launcher with Skin Browser / SD Card Info / System Info / Screensaver settings / About in one place.
+
+### 4. Status bar enhancements
+12H / 24H toggle, timezone setting (NVS-persisted), and SNTP synchronization.
+
+---
+
 > ## $\color{blue}{\textsf{推奨 / Recommended}}$
 >
 > 本 fork (GOB fork) と公式ファームウェアを行き来する際、**公式ファームウェアの書き戻し (M5Burner 等)** や **NVS partition の事故的破損** により、Wi-Fi / xiaozhi 接続情報など各種設定がリセットされる可能性があります。あらかじめ NVS partition (16 KB, offset 0x9000) のバックアップを取っておくことを推奨します。
@@ -50,7 +82,7 @@ python3 ./fetch_repos.py
 - `firmware/repos.json` または `firmware/patches/` 配下の patch を更新したとき
 - `firmware/xiaozhi-esp32/` を消してやり直したいとき
 
-### 2. `firmware/sdkconfig` の削除 (本 fork へ切替えた直後)
+### 2. FATFS Long File Name (LFN) の有効化
 
 本 fork は `sdkconfig.defaults` で **FATFS の Long File Name (LFN)** を有効化しています (公式は OFF)。`sdkconfig.defaults` は `firmware/sdkconfig` が**存在しないとき**だけ参照されるため、既存ビルド環境ではそのままだと反映されません。
 
@@ -62,6 +94,17 @@ rm firmware/sdkconfig
 - 公式 → 本 fork へ切替えた直後 (LFN を含む defaults 変更を取り込むため)
 - `firmware/sdkconfig.defaults` を更新したとき
 - `idf.py fullclean` は `build/` のみ消すので `sdkconfig` は別途削除が必要
+
+#### 既に `sdkconfig` をカスタマイズしている場合
+
+削除すると自分の設定が消えてしまうため、`idf.py menuconfig` で以下を**手で有効化**してください:
+
+| 設定 | menuconfig パス |
+| ---- | --------------- |
+| `CONFIG_FATFS_LFN_STACK=y` | Component config → FAT Filesystem support → Long filename support → **Long filename buffer in stack** |
+| `CONFIG_FATFS_MAX_LFN=255` | Component config → FAT Filesystem support → **Max long filename length** = `255` |
+
+(両方未設定だと `/sdcard/eye_right_closed.png` 等の長いファイル名が開けず、Skin が DefaultAvatar に fallback します。)
 
 ---
 
@@ -81,7 +124,7 @@ When required:
 - After updating `firmware/repos.json` or any patch under `firmware/patches/`
 - When you want to wipe `firmware/xiaozhi-esp32/` and start over
 
-### 2. Delete `firmware/sdkconfig` (right after switching to this fork)
+### 2. Enable FATFS Long File Name (LFN)
 
 This fork enables **FATFS Long File Name (LFN)** in `sdkconfig.defaults` (the official fork has it OFF). `sdkconfig.defaults` is only consulted when `firmware/sdkconfig` is **absent**, so an existing build env will not pick up the change unless you delete it.
 
@@ -94,10 +137,16 @@ When required:
 - After modifying `firmware/sdkconfig.defaults`
 - Note: `idf.py fullclean` only wipes `build/`, so `sdkconfig` must be removed separately.
 
-## GOB fork ドキュメント / Additional Docs
+#### If you already have a customized `sdkconfig`
 
-- [Avatar.md](Avatar.md) — アバター / スキン JSON 仕様 (Avatar & skin JSON spec)
-- [NFC.md](NFC.md) — NFC タグコマンド (NFC tag command reference)
+Deleting it would discard your settings, so enable the following manually with `idf.py menuconfig`:
+
+| Setting | menuconfig path |
+| ------- | --------------- |
+| `CONFIG_FATFS_LFN_STACK=y` | Component config → FAT Filesystem support → Long filename support → **Long filename buffer in stack** |
+| `CONFIG_FATFS_MAX_LFN=255` | Component config → FAT Filesystem support → **Max long filename length** = `255` |
+
+(Without both, long filenames such as `/sdcard/eye_right_closed.png` cannot be opened and the skin falls back to DefaultAvatar.)
 
 ---
 # StackChan Open-Source
