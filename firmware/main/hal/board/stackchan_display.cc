@@ -3,11 +3,14 @@
  *
  * SPDX-License-Identifier: MIT
  */
+// Modified by GOB (X:@GOB_52_GOB / GitHub:GOB52) - StackChan firmware fork
 #include "stackchan_display.h"
 #include <esp_log.h>
 #include <esp_err.h>
 #include <esp_lvgl_port.h>
 #include <esp_psram.h>
+#include <algorithm>
+#include <string_view>
 #include <vector>
 #include <cstring>
 #include <src/misc/cache/lv_cache.h>
@@ -16,6 +19,7 @@
 #include <lvgl_theme.h>
 #include <stackchan/stackchan.h>
 #include <stackchan/avatar/skins/image/skin_loader.h>
+#include <stackchan/gob_fork_nvs.h>
 #include <assets/lang_config.h>
 #include <hal/hal.h>
 
@@ -23,6 +27,104 @@ using namespace stackchan;
 using namespace stackchan::avatar;
 
 #define TAG "StackChanAvatarDisplay"
+
+namespace {
+
+// GOB fork: UTF-8 1 char のバイト長を返す。lead byte の上位ビットで判定。
+size_t utf8_char_len(const unsigned char c)
+{
+    if ((c & 0x80) == 0x00) return 1;       // ASCII
+    if ((c & 0xE0) == 0xC0) return 2;       // 2-byte
+    if ((c & 0xF0) == 0xE0) return 3;       // 3-byte (CJK の大半)
+    if ((c & 0xF8) == 0xF0) return 4;       // 4-byte
+    return 1;                                // 不正バイト: 1 として進める
+}
+
+// GOB fork: UTF-8 文字列の char (= code point) 数。pacing 用。
+size_t utf8_char_count(std::string_view s)
+{
+    size_t count = 0;
+    for (size_t i = 0; i < s.size(); ) {
+        i += utf8_char_len(static_cast<unsigned char>(s[i]));
+        count++;
+    }
+    return count;
+}
+
+// GOB fork: 句読点判定 (CJK 全角 + ASCII)。これらの文字直後で segment を切る。
+bool is_segment_delimiter(std::string_view ch)
+{
+    static constexpr const char* DELIMS[] = {
+        "、", "。", "！", "？", "，",  // CJK 句読点 (3 byte UTF-8)
+        ",", ".", "!", "?",            // ASCII
+    };
+    for (auto* d : DELIMS) {
+        if (ch == d) return true;
+    }
+    return false;
+}
+
+// GOB fork: 1 chunk を句読点で fragment に分割 (内部用)。区切り文字は前 fragment に含める。
+std::vector<std::string> split_to_fragments(std::string_view text)
+{
+    std::vector<std::string> fragments;
+    std::string current;
+    for (size_t i = 0; i < text.size(); ) {
+        const size_t len = utf8_char_len(static_cast<unsigned char>(text[i]));
+        const std::string_view ch = text.substr(i, len);
+        current.append(ch);
+        i += len;
+        if (is_segment_delimiter(ch)) {
+            fragments.emplace_back(std::move(current));
+            current.clear();
+        }
+    }
+    if (!current.empty()) fragments.emplace_back(std::move(current));
+    return fragments;
+}
+
+// GOB fork: bubble の inner_w (280px) に収まる字数の概算上限。
+// CJK 14px/char 平均で 280/14 = 20。少し余裕を持たせて 18 文字。
+constexpr size_t SEGMENT_MAX_CHARS = 18;
+
+// GOB fork: 句読点で fragment 化 → bubble に収まる範囲で隣接 fragment をマージ。
+//
+// - 入力が短ければ 1 segment (split せず)
+// - 長文でも 18 字以内に収まる範囲で fragment を結合
+// - 1 fragment 単体が 18 字超なら分割不能なのでそのまま 1 segment として返す
+// - '%' で始まる LLM tool call indicator は分割せず 1 segment で一括 dispatch
+//   (内部に '.' (関数 separator) を含むが意味的に 1 つの命令なので)
+std::vector<std::string> smart_split(std::string_view text)
+{
+    if (!text.empty() && text.front() == '%') {
+        return {std::string(text)};
+    }
+    auto fragments = split_to_fragments(text);
+    std::vector<std::string> segments;
+    std::string current;
+    size_t current_chars = 0;
+
+    for (auto& frag : fragments) {
+        const size_t frag_chars = utf8_char_count(frag);
+        if (current.empty()) {
+            current        = std::move(frag);
+            current_chars  = frag_chars;
+        } else if (current_chars + frag_chars <= SEGMENT_MAX_CHARS) {
+            current.append(frag);
+            current_chars += frag_chars;
+        } else {
+            segments.push_back(std::move(current));
+            current        = std::move(frag);
+            current_chars  = frag_chars;
+        }
+    }
+    if (!current.empty()) {
+        segments.push_back(std::move(current));
+    }
+    return segments;
+}
+
+}  // namespace
 
 LV_FONT_DECLARE(BUILTIN_TEXT_FONT);
 LV_FONT_DECLARE(BUILTIN_ICON_FONT);
@@ -198,6 +300,13 @@ StackChanAvatarDisplay::StackChanAvatarDisplay(esp_lcd_panel_io_handle_t panel_i
 StackChanAvatarDisplay::~StackChanAvatarDisplay()
 {
     ESP_LOGI(TAG, "Destroying StackChanAvatarDisplay");
+
+    // GOB fork: segment timer / queue 清掃
+    if (segment_timer_ != nullptr) {
+        lv_timer_delete(segment_timer_);
+        segment_timer_ = nullptr;
+    }
+    segment_queue_.clear();
 
     if (preview_timer_ != nullptr) {
         esp_timer_stop(preview_timer_);
@@ -375,9 +484,20 @@ void StackChanAvatarDisplay::SetChatMessage(const char* role, const char* conten
     DisplayLockGuard lock(this);
 
     if (strcmp(role, "system") == 0) {
+        // GOB fork: 状態 status は assistant utterance を上書きする。queue に
+        // 残った segment があるなら破棄して新メッセージで置換。
+        clearSegmentQueue();
         stackchan.avatar().setSpeech(content);
     } else if (strcmp(role, "assistant") == 0) {
-        stackchan.avatar().setSpeech(content);
+        // GOB fork: NVS の bubble_fx flag で挙動切替。
+        // ON  : 句読点 split + segment_queue + tail-follow scroll + dismiss
+        // OFF : upstream そのまま (chunk ごと setSpeech で置換)
+        if (stackchan::gob_fork::get_bubble_fx_enabled()) {
+            enqueueAssistantChunks(std::string(content));
+        } else {
+            clearSegmentQueue();  // 念のため (FX OFF 中は queue 不使用)
+            stackchan.avatar().setSpeech(content);
+        }
     }
 }
 
@@ -390,9 +510,69 @@ void StackChanAvatarDisplay::ClearChatMessages()
 
     DisplayLockGuard lock(this);
 
+    // GOB fork: queue + timer も解除 (segment 残骸を消す)
+    clearSegmentQueue();
     stackchan.avatar().clearSpeech();
 
     ESP_LOGI(TAG, "Chat messages cleared");
+}
+
+// ---- GOB fork: long-sentence segmentation queue ----------------------------
+
+void StackChanAvatarDisplay::enqueueAssistantChunks(const std::string& content)
+{
+    if (content.empty()) return;
+
+    auto segments = smart_split(content);
+    for (auto& s : segments) {
+        if (!s.empty()) segment_queue_.push_back(std::move(s));
+    }
+    if (!segment_timer_ && !segment_queue_.empty()) {
+        // タイマ未起動かつ queue に内容あり → 先頭を即 dispatch (以降は timer chain)
+        dispatchNextSegmentLocked();
+    }
+}
+
+void StackChanAvatarDisplay::dispatchNextSegmentLocked()
+{
+    if (segment_queue_.empty()) return;
+    std::string seg = std::move(segment_queue_.front());
+    segment_queue_.pop_front();
+
+    auto& stackchan = GetStackChan();
+    if (stackchan.hasAvatar()) {
+        stackchan.avatar().appendSpeech(seg);
+    }
+
+    if (!segment_queue_.empty()) {
+        // 次 segment までの delay = 表示中 segment の字数 × 200ms (TTS rate ~5 chars/sec)
+        // 最低 200ms (1 文字以下でも間を取る)
+        const uint32_t chars = static_cast<uint32_t>(utf8_char_count(seg));
+        const uint32_t delay_ms = std::max<uint32_t>(200u, chars * 200u);
+        segment_timer_ = lv_timer_create(&StackChanAvatarDisplay::onSegmentTimer, delay_ms, this);
+        if (segment_timer_) {
+            lv_timer_set_repeat_count(segment_timer_, 1);
+        }
+    }
+}
+
+void StackChanAvatarDisplay::clearSegmentQueue()
+{
+    segment_queue_.clear();
+    if (segment_timer_) {
+        lv_timer_delete(segment_timer_);
+        segment_timer_ = nullptr;
+    }
+}
+
+void StackChanAvatarDisplay::onSegmentTimer(lv_timer_t* t)
+{
+    auto* self = static_cast<StackChanAvatarDisplay*>(lv_timer_get_user_data(t));
+    if (!self) return;
+    // repeat_count=1 で auto-delete されるので pointer をクリア
+    self->segment_timer_ = nullptr;
+    // LVGL task context = lock 状態。直接 dispatch 可能
+    self->dispatchNextSegmentLocked();
 }
 
 void StackChanAvatarDisplay::SetPreviewImage(std::unique_ptr<LvglImage> image)
@@ -478,10 +658,15 @@ void StackChanAvatarDisplay::SetStatus(const char* status)
 
     if (strcmp(status, Lang::Strings::LISTENING) == 0) {
         if (speaking_modifier_id_ >= 0) {
-            // Start speaking
+            // Stop speaking
             stackchan.removeModifier(speaking_modifier_id_);
             avatar.mouth().setWeight(0);
             speaking_modifier_id_ = -1;
+            // GOB fork: bubble FX が ON のときのみ dismiss 予約 (slide 完了 +
+            // 3 秒)。OFF (upstream 挙動) では bubble は明示クリアまで残す。
+            if (stackchan::gob_fork::get_bubble_fx_enabled()) {
+                avatar.requestSpeechDismissAfterRender(3000);
+            }
         }
 
         GetHAL().setRgbColor(0, 0, 50, 0);
