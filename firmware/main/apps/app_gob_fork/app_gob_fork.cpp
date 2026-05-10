@@ -205,6 +205,20 @@ void AppGobFork::build_main_menu()
                      _switch_pending = true;
                      _pending_page   = Page::Main;
                  }},
+                {std::string("Bubble FX: ") +
+                     (stackchan::gob_fork::get_bubble_fx_enabled() ? "ON" : "OFF"),
+                 [&]() {
+                     const bool new_state = !stackchan::gob_fork::get_bubble_fx_enabled();
+                     if (!stackchan::gob_fork::set_bubble_fx_enabled(new_state)) {
+                         view::pop_a_toast("NVS save failed", view::ToastType::Error, 2000);
+                         return;
+                     }
+                     mclog::tagInfo(getAppInfo().name, "Bubble FX -> {}",
+                                    new_state ? "ON" : "OFF");
+                     // 即時反映 (再起動不要)。Main page 再描画で label 更新。
+                     _switch_pending = true;
+                     _pending_page   = Page::Main;
+                 }},
                 {"Restart Device",
                  [&]() {
                      show_confirm_dialog("Restart Device?",

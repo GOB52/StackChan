@@ -44,4 +44,11 @@ bool        set_nfc_enabled(const bool enabled);
 bool        get_time_format_24h();
 bool        set_time_format_24h(const bool use24h);
 
+// --- Speech bubble FX (NVS key: "bubble_fx") --------------------------------
+// Default ON: utterance accumulator + tail-follow scroll + 1-sec dismiss +
+// long-sentence segmentation. OFF falls back to upstream behavior (each
+// chunk replaces previous text).
+bool        get_bubble_fx_enabled();
+bool        set_bubble_fx_enabled(const bool enabled);
+
 }  // namespace stackchan::gob_fork
