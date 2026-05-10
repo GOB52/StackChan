@@ -991,3 +991,30 @@ menu "BLE prph Configuration"
             Use this option to enable resolving peer's address.
 
 endmenu
+
+menu "GOB Fork"
+
+    config GOB_FORK_ENABLE_ERROR_TOAST
+        bool "Enable Error Toast (red toast for ESP_LOGE)"
+        default n
+        help
+            ESP_LOGE hook + dispatch task + queue.
+            Surfaces errors from a TAG whitelist (MCP / MQTT / Application /
+            OTA / WifiStation) as red Toast on screen, throttled to 1 toast
+            per TAG per second. Console output is preserved.
+            Cost when enabled: ~4-5 KB DRAM (4 KB dispatch task stack +
+            FreeRTOS queue + per-TAG throttle state).
+            Default OFF to save DRAM. Runtime NVS key "error_toast" works
+            only when this is enabled at compile time.
+
+    config GOB_FORK_ENABLE_NFC
+        bool "Enable NFC (M5Unit-NFC integration)"
+        default n
+        help
+            NFC poll task + NDEF cmd dispatcher (M5Unit-NFC over I2C).
+            When OFF, the NFC code, M5Unit-NFC component usage, and the
+            related NVS getter/setter (nfc_enabled) are compiled out
+            entirely. Default OFF to save DRAM and avoid I2C bus contention
+            with the audio codec on shared bus.
+
+endmenu

@@ -85,3 +85,9 @@ CONFIG_LV_BUILD_DEMOS=n
 # Mooncake apps (and the SD probe / skin_loader) run.
 CONFIG_FATFS_LFN_STACK=y
 CONFIG_FATFS_MAX_LFN=255
+
+# --- GOB Fork compile-time feature toggles ---
+# See main/Kconfig.projbuild for descriptions. Default values are also
+# enforced by Kconfig; listed here for visibility / quick toggle.
+CONFIG_GOB_FORK_ENABLE_ERROR_TOAST=n
+CONFIG_GOB_FORK_ENABLE_NFC=n
