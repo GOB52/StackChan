@@ -6,13 +6,24 @@
 SD カードに置いた PNG セットでアバターを差替できます。複数スキンを切替可能で、選択は NVS に永続化されます。Emotion ごとの装飾 (Heart / Shy / Dizzy / Sleepy / Doubt) や HeadPet 演出にも対応。詳細は [Avatar.md](Avatar.md) を参照。
 
 ### 2. NFC タグ連携
-M5Unit-NFC を opt-in で接続でき、`stackchan:cmd` MIME を持つ NDEF タグから JSON コマンドを発火できます (head 動作 / dance / emotion 切替 等)。**使用前に GOB FORK menu → NFC を ON にして再起動** する必要があります (デフォルト OFF、AI Agent 中の audio 安定性への影響を避けるため)。詳細は [NFC.md](NFC.md) を参照。
+M5Unit-NFC を opt-in で接続でき、`stackchan:cmd` MIME を持つ NDEF タグから JSON コマンドを発火できます (head 動作 / dance / emotion 切替 等)。**デフォルトでは無効** (AI Agent 中の audio 安定性への影響と DRAM 消費のため)。使用するには 2 段階の有効化が必要です:
 
-### 3. GOB FORK ランチャーアプリ
-launcher 画面に専用 app を追加し、Skin Browser / SD Card Info / System Info / Screensaver 設定 / About を一括管理できます。
+1. **コンパイル時に有効化**: `sdkconfig` で `CONFIG_GOB_FORK_ENABLE_NFC=y` を設定 (`idf.py menuconfig` → Top → "GOB Fork" → "Enable NFC")。詳細は「ビルド前の注意 → 3. GOB Fork コンパイル時オプション」を参照。
+2. **実行時に有効化**: GOB FORK menu → NFC を ON にして再起動。
 
-### 4. ステータスバー強化
+詳細は [NFC.md](NFC.md) を参照。
+
+### 3. ステータスバー強化
 12H / 24H 切替、TZ 設定 (NVS 永続化)、SNTP 同期に対応。
+
+### 4. 吹き出しの追従スクロール (Bubble FX)
+発話に合わせて吹き出し内の text を末尾に追従させる tail-follow scroll。長文は 句読点ベースで適度に chunk 化し、bubble に収まらない部分は左へスライドして末尾文字を見せます。**TTS の音声と完全にリアルタイム同期しているわけではありません** — 表示は LLM の chunk 配信タイミングと内部の segment timer に依存し、音声の音素単位での追従ではありません。発話完了後 3 秒で自動 dismiss。GOB FORK menu → **Bubble FX** で ON / OFF 切替可能 (NVS 永続、再起動不要)。OFF にすると upstream 1.3.0 互換の LVGL ネイティブ `SCROLL_CIRCULAR` 挙動に戻ります。
+
+### 5. スクリーンセーバー時間設定
+**Launcher のメニュー画面** で無操作が続いた場合のスクリーンセーバー起動までの時間を、GOB FORK menu → **Screensaver Settings** から **Off / 30 秒 / 1 分 / 5 分 / 10 分** で選択可能 (NVS 永続)。AI Agent 起動中など他の画面には適用されません。
+
+### 6. GOB FORK ランチャーアプリ
+launcher 画面に専用 app を追加し、Skin Browser / SD Card Info / System Info / Screensaver 設定 / About / NFC・Bubble FX・Error Toast の各 toggle を一括管理できます。
 
 ---
 
@@ -22,13 +33,24 @@ launcher 画面に専用 app を追加し、Skin Browser / SD Card Info / System
 Swap the avatar with a PNG set placed on the SD card. Multi-skin selection is persisted in NVS. Per-emotion decorators (Heart / Shy / Dizzy / Sleepy / Doubt) and the HeadPet animation are supported. See [Avatar.md](Avatar.md) for details.
 
 ### 2. NFC tag integration
-Optional M5Unit-NFC support: NDEF tags with the `stackchan:cmd` MIME type trigger JSON commands (head motion / dance / emotion switch, etc.). **Before use, enable NFC via the GOB FORK menu and reboot** (off by default to keep AI Agent audio stable). See [NFC.md](NFC.md) for details.
+Optional M5Unit-NFC support: NDEF tags with the `stackchan:cmd` MIME type trigger JSON commands (head motion / dance / emotion switch, etc.). **Disabled by default** (to keep AI Agent audio stable and save DRAM). Two-stage enablement is required:
 
-### 3. GOB FORK launcher app
-Adds a dedicated app to the launcher with Skin Browser / SD Card Info / System Info / Screensaver settings / About in one place.
+1. **Compile-time**: set `CONFIG_GOB_FORK_ENABLE_NFC=y` in `sdkconfig` (`idf.py menuconfig` → Top → "GOB Fork" → "Enable NFC"). See "Pre-build Notes → 3. GOB Fork compile-time toggles" for details.
+2. **Runtime**: GOB FORK menu → flip NFC to ON and reboot.
 
-### 4. Status bar enhancements
+See [NFC.md](NFC.md) for details.
+
+### 3. Status bar enhancements
 12H / 24H toggle, timezone setting (NVS-persisted), and SNTP synchronization.
+
+### 4. Speech bubble follow-scroll (Bubble FX)
+Tail-follows the utterance inside the bubble: long sentences are chunked at punctuation boundaries, and overflow scrolls left to keep the latest characters visible. **Not strictly synced with TTS audio in real time** — display follows LLM chunk delivery and the internal segment-timer cadence rather than per-syllable timing. Auto-dismisses 3 seconds after completion. Toggle via GOB FORK menu → **Bubble FX** (NVS-persisted, no reboot). When OFF, behavior reverts to upstream 1.3.0-compatible LVGL native `SCROLL_CIRCULAR`.
+
+### 5. Screensaver timeout settings
+Pick the screensaver activation timeout (**Off / 30 sec / 1 min / 5 min / 10 min**) via GOB FORK menu → **Screensaver Settings** (NVS-persisted). Applies **only while the launcher menu is foreground**; AI Agent and other screens are unaffected.
+
+### 6. GOB FORK launcher app
+Adds a dedicated app to the launcher that consolidates Skin Browser / SD Card Info / System Info / Screensaver Settings / About / NFC / Bubble FX / Error Toast toggles in one place.
 
 ---
 
@@ -106,6 +128,29 @@ rm firmware/sdkconfig
 
 (両方未設定だと `/sdcard/eye_right_closed.png` 等の長いファイル名が開けず、Skin が DefaultAvatar に fallback します。)
 
+### 3. GOB Fork コンパイル時オプション
+
+本 fork は一部機能をコンパイル時に有効/無効化できます (`firmware/main/Kconfig.projbuild`):
+
+| Kconfig | デフォルト | 内容 |
+| --- | --- | --- |
+| `CONFIG_GOB_FORK_ENABLE_ERROR_TOAST` | **n** (OFF) | ESP_LOGE を赤 Toast で画面表示 (whitelist: MCP / MQTT / Application / OTA / WifiStation)。 |
+| `CONFIG_GOB_FORK_ENABLE_NFC` | **n** (OFF) | M5Unit-NFC poll task + NDEF dispatcher。I2C bus を audio codec と共有するためデフォルト OFF。 |
+
+切替方法:
+
+```bash
+cd firmware
+idf.py menuconfig
+# Top-level menu → "GOB Fork" → toggle
+```
+
+**VS Code (ESP-IDF Extension) の場合**:
+- `Cmd+Shift+P` → **`ESP-IDF: SDK Configuration Editor (Menuconfig)`** を選択
+- 検索ボックスで `GOB` と入力 → 該当 entry のチェックボックスで切替 → 右上 **Save**
+
+注意: OFF にした機能は完全にコード除外されるため、対応する GOB FORK menu 項目 (Error Toast / NFC) も非表示になります。NVS 設定は意味を持ちません。
+
 ---
 
 Before building this fork, please run the following.
@@ -147,6 +192,29 @@ Deleting it would discard your settings, so enable the following manually with `
 | `CONFIG_FATFS_MAX_LFN=255` | Component config → FAT Filesystem support → **Max long filename length** = `255` |
 
 (Without both, long filenames such as `/sdcard/eye_right_closed.png` cannot be opened and the skin falls back to DefaultAvatar.)
+
+### 3. GOB Fork compile-time toggles
+
+This fork exposes optional features behind compile-time toggles (`firmware/main/Kconfig.projbuild`):
+
+| Kconfig | Default | Description |
+| --- | --- | --- |
+| `CONFIG_GOB_FORK_ENABLE_ERROR_TOAST` | **n** (OFF) | Surface ESP_LOGE from a TAG whitelist (MCP / MQTT / Application / OTA / WifiStation) as a red Toast. |
+| `CONFIG_GOB_FORK_ENABLE_NFC` | **n** (OFF) | M5Unit-NFC poll task + NDEF dispatcher. OFF by default to avoid I2C bus contention with the audio codec. |
+
+How to toggle:
+
+```bash
+cd firmware
+idf.py menuconfig
+# Top-level menu → "GOB Fork" → flip
+```
+
+**Using VS Code (ESP-IDF Extension)**:
+- `Cmd+Shift+P` → select **`ESP-IDF: SDK Configuration Editor (Menuconfig)`**
+- Type `GOB` in the search box → flip the checkbox → click **Save**
+
+Note: When OFF, the feature is fully compiled out, the related GOB FORK menu entries (Error Toast / NFC) are hidden, and the corresponding NVS settings have no effect.
 
 ---
 # StackChan Open-Source
