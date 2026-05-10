@@ -5,6 +5,7 @@
  */
 // Modified by GOB (X:@GOB_52_GOB / GitHub:GOB52) - StackChan firmware fork
 #pragma once
+#include <sdkconfig.h>
 #include <memory>
 #include <cstdint>
 #include <string>
@@ -57,6 +58,7 @@ enum class ImuMotionEvent {
  * @brief NFC tag detection event payload (GOB fork: M5Unit-NFC integration).
  * UID + classified PICC type (no NDEF payload).
  */
+#if CONFIG_GOB_FORK_ENABLE_NFC
 struct NfcTagEvent_t {
     std::string uid;   // hex string (e.g. "04A1B2C3D4E5F6")
     std::string type;  // classified PICC type (e.g. "MIFARE Classic 1K")
@@ -71,6 +73,7 @@ struct NfcCmdEvent_t {
     std::string          uid;      // tag UID for logging / future idempotency
     std::vector<uint8_t> payload;  // raw NDEF record payload bytes (UTF-8 JSON)
 };
+#endif  // CONFIG_GOB_FORK_ENABLE_NFC
 
 /**
  * @brief
@@ -272,6 +275,7 @@ public:
     /* ----------------------------------- IMU ---------------------------------- */
     uitk::Signal<ImuMotionEvent> onImuMotionEvent;
 
+#if CONFIG_GOB_FORK_ENABLE_NFC
     /* ----------------------------------- NFC ---------------------------------- */
     // GOB fork: M5Unit-NFC tag detection. UID/type only.
     uitk::Signal<const NfcTagEvent_t&> onNfcTagDetected;
@@ -288,6 +292,11 @@ public:
     // (notably the FT6336 touchpad esp_timer on core 0) check this and
     // skip their poll cycle to avoid cross-core I2C contention.
     static bool isNfcBusy();
+#else
+    // Stub for non-NFC builds: callers (e.g. FT6336 poll) check this and
+    // skip; with NFC compiled out it always returns false.
+    static bool isNfcBusy() { return false; }
+#endif  // CONFIG_GOB_FORK_ENABLE_NFC
 
     // True while the audio codec (ES7210/AW88298 on the shared I2C bus) is
     // mid-initialization (esp_codec_dev_open). FT6336 touchpad esp_timer

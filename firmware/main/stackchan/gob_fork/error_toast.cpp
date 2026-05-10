@@ -1,5 +1,9 @@
 // StackChan firmware fork - new file by GOB (X:@GOB_52_GOB / GitHub:GOB52)
 #include "error_toast.h"
+
+#if CONFIG_GOB_FORK_ENABLE_ERROR_TOAST
+#pragma message "[GOB Fork] CONFIG_GOB_FORK_ENABLE_ERROR_TOAST=y"
+
 #include "utf8_helper.h"
 
 #include <stackchan/gob_fork_nvs.h>
@@ -227,3 +231,5 @@ void refresh_enabled_from_nvs()
 }
 
 }  // namespace stackchan::gob_fork::error_toast
+
+#endif  // CONFIG_GOB_FORK_ENABLE_ERROR_TOAST

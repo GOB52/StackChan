@@ -1,5 +1,8 @@
 // StackChan firmware fork - new file by GOB (X:@GOB_52_GOB / GitHub:GOB52)
 #include "nfc_cmd_dispatcher.h"
+
+#if CONFIG_GOB_FORK_ENABLE_NFC
+
 #include "../../hal/hal.h"
 #include "../../hal/board/hal_bridge.h"
 #include "../../assets/assets.h"
@@ -264,3 +267,5 @@ void CmdDispatcher::initOnce()
 
 }  // namespace nfc
 }  // namespace stackchan
+
+#endif  // CONFIG_GOB_FORK_ENABLE_NFC

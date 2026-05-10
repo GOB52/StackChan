@@ -9,10 +9,14 @@ namespace {
 
 constexpr const char* _key_skin_current   = "skin_current";
 constexpr const char* _key_screensaver_to = "scr_timeout_s";
+#if CONFIG_GOB_FORK_ENABLE_NFC
 constexpr const char* _key_nfc_enabled    = "nfc_enabled";
+#endif
 constexpr const char* _key_time_24h       = "time_24h";
 constexpr const char* _key_bubble_fx      = "bubble_fx";
+#if CONFIG_GOB_FORK_ENABLE_ERROR_TOAST
 constexpr const char* _key_error_toast    = "error_toast";
+#endif
 
 }  // namespace
 
@@ -79,6 +83,7 @@ bool set_screensaver_timeout_s(const uint32_t s)
     return ok;
 }
 
+#if CONFIG_GOB_FORK_ENABLE_NFC
 bool get_nfc_enabled()
 {
     nvs_handle_t h = 0;
@@ -98,6 +103,7 @@ bool set_nfc_enabled(const bool enabled)
     nvs_close(h);
     return ok;
 }
+#endif  // CONFIG_GOB_FORK_ENABLE_NFC
 
 bool get_time_format_24h()
 {
@@ -139,6 +145,7 @@ bool set_bubble_fx_enabled(const bool enabled)
     return ok;
 }
 
+#if CONFIG_GOB_FORK_ENABLE_ERROR_TOAST
 bool get_error_toast_enabled()
 {
     nvs_handle_t h = 0;
@@ -158,5 +165,6 @@ bool set_error_toast_enabled(const bool enabled)
     nvs_close(h);
     return ok;
 }
+#endif  // CONFIG_GOB_FORK_ENABLE_ERROR_TOAST
 
 }  // namespace stackchan::gob_fork

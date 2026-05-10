@@ -179,6 +179,7 @@ void AppGobFork::build_main_menu()
                      _switch_pending = true;
                      _pending_page   = Page::SdCardInfo;
                  }},
+#if CONFIG_GOB_FORK_ENABLE_NFC
                 {std::string("NFC: ") +
                      (stackchan::gob_fork::get_nfc_enabled() ? "ON" : "OFF"),
                  [&]() {
@@ -191,6 +192,7 @@ void AppGobFork::build_main_menu()
                                "stability while AI Agent is running.",
                          PendingMenuAction::ToggleNfc);
                  }},
+#endif  // CONFIG_GOB_FORK_ENABLE_NFC
                 {std::string("Time: ") +
                      (stackchan::gob_fork::get_time_format_24h() ? "24H" : "12H"),
                  [&]() {
@@ -220,6 +222,7 @@ void AppGobFork::build_main_menu()
                      _switch_pending = true;
                      _pending_page   = Page::Main;
                  }},
+#if CONFIG_GOB_FORK_ENABLE_ERROR_TOAST
                 {std::string("Error Toast: ") +
                      (stackchan::gob_fork::get_error_toast_enabled() ? "ON" : "OFF"),
                  [&]() {
@@ -235,6 +238,7 @@ void AppGobFork::build_main_menu()
                      _switch_pending = true;
                      _pending_page   = Page::Main;
                  }},
+#endif  // CONFIG_GOB_FORK_ENABLE_ERROR_TOAST
                 {"Restart Device",
                  [&]() {
                      show_confirm_dialog("Restart Device?",
@@ -373,6 +377,7 @@ void AppGobFork::perform_menu_action(const PendingMenuAction action)
             mclog::tagInfo(getAppInfo().name, "restart device");
             GetHAL().reboot();
             break;
+#if CONFIG_GOB_FORK_ENABLE_NFC
         case PendingMenuAction::ToggleNfc: {
             const bool new_state = !stackchan::gob_fork::get_nfc_enabled();
             if (!stackchan::gob_fork::set_nfc_enabled(new_state)) {
@@ -383,6 +388,7 @@ void AppGobFork::perform_menu_action(const PendingMenuAction action)
             GetHAL().reboot();
             break;
         }
+#endif  // CONFIG_GOB_FORK_ENABLE_NFC
         case PendingMenuAction::None:
             break;
     }

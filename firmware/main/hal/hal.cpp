@@ -6,7 +6,9 @@
 // Modified by GOB (X:@GOB_52_GOB / GitHub:GOB52) - StackChan firmware fork
 #include "hal.h"
 #include "board/sd_guard.h"
+#if CONFIG_GOB_FORK_ENABLE_NFC
 #include "../stackchan/nfc/nfc_cmd_dispatcher.h"
+#endif
 #include <memory>
 #include <mooncake_log.h>
 #include <nvs_flash.h>
@@ -214,11 +216,13 @@ static void _stackchan_update_task(void* param)
             GetHAL().startSntp();
             view::create_home_indicator([]() { GetHAL().requestWarmReboot(0); }, 0x81DBBD, 0x134233);
             view::create_status_bar(0x81DBBD, 0x134233);
+#if CONFIG_GOB_FORK_ENABLE_NFC
             // GOB fork: NFC を遅延初期化 (audio codec init を妨げないため)
             GetHAL().startNfc();
             // GOB fork: stackchan:cmd dispatcher を起動。NFC opt-out 時でも
             // 害はない (signal が emit されないだけ) ので無条件で初期化。
             stackchan::nfc::CmdDispatcher::initOnce();
+#endif
             is_setup_done = true;
         }
 
