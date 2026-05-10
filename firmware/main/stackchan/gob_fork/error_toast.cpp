@@ -7,7 +7,11 @@
 #include "utf8_helper.h"
 
 #include <stackchan/gob_fork_nvs.h>
-#include <apps/common/toast/toast.h>
+#include <stackchan/stackchan.h>
+// toast_decorator.h が apps/common/toast/toast.h (include guard なし) を include
+// しているため、ここでは toast.h を直接 include しない (二重 include で
+// redefinition error になる)。
+#include <stackchan/avatar/decorators/toast_decorator.h>
 
 #include <esp_log.h>
 #include <esp_timer.h>
@@ -147,7 +151,14 @@ void toast_dispatch_task(void* /*arg*/)
     ToastMsg msg{};
     while (true) {
         if (xQueueReceive(toast_queue_, &msg, portMAX_DELAY) == pdTRUE) {
-            view::pop_a_toast(msg.text, view::ToastType::Error, TOAST_DURATION_MS);
+            // xiaozhi runtime (mooncake destroyed) は avatar の update tick で
+            // pump される ToastDecorator 経由でないと描画されない。
+            // launcher / app_setup 等の mooncake 駆動時は従来の ToastManager 経由。
+            if (GetStackChan().hasAvatar()) {
+                stackchan::avatar::pop_avatar_toast(msg.text, view::ToastType::Error, TOAST_DURATION_MS);
+            } else {
+                view::pop_a_toast(msg.text, view::ToastType::Error, TOAST_DURATION_MS);
+            }
         }
     }
 }
@@ -155,10 +166,12 @@ void toast_dispatch_task(void* /*arg*/)
 int custom_vprintf(const char* fmt, va_list args)
 {
     // 1. 旧 vprintf へ転送 (console 出力維持)
-    va_list args_copy;
-    va_copy(args_copy, args);
-    int ret = prev_vprintf_ ? prev_vprintf_(fmt, args_copy) : std::vprintf(fmt, args_copy);
-    va_end(args_copy);
+    va_list args_for_prev;
+    va_copy(args_for_prev, args);
+    int ret = prev_vprintf_
+                  ? prev_vprintf_(fmt, args_for_prev)
+                  : std::vprintf(fmt, args_for_prev);
+    va_end(args_for_prev);
 
     // 2. enabled 判定
     if (!enabled_cache_.load(std::memory_order_relaxed)) return ret;
@@ -166,7 +179,10 @@ int custom_vprintf(const char* fmt, va_list args)
 
     // 3. format 解決
     char buf[256];
-    int written = std::vsnprintf(buf, sizeof(buf), fmt, args);
+    va_list args_for_snprintf;
+    va_copy(args_for_snprintf, args);
+    int written = std::vsnprintf(buf, sizeof(buf), fmt, args_for_snprintf);
+    va_end(args_for_snprintf);
     if (written <= 0) return ret;
     if (written >= static_cast<int>(sizeof(buf))) buf[sizeof(buf) - 1] = '\0';
 
