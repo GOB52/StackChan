@@ -63,6 +63,7 @@ void Hal::init()
 #include <esp_ota_ops.h>
 #include <esp_system.h>
 #include <esp_timer.h>
+#include <esp_log.h>
 #include <esp_mac.h>
 
 void Hal::delay(std::uint32_t ms)
@@ -178,8 +179,22 @@ static void _stackchan_update_task(void* param)
 
         LvglLockGuard lock;
 
+        // GOB fork: upstream v1.2.6 の "non-idle 時 100ms delay" を 33ms に短縮。
+        // 条件は upstream のまま (!is_xiaozhi_idle) を維持。
+        //
+        // 経緯 (実機試行ログ):
+        //  - 0ms (撤去)                   → speaking 中 audio プチノイズ発生
+        //  - speaking 限定 100ms          → わずかにプチノイズ残存
+        //  - speaking 限定 25ms           → IDLE0 (CPU 0) watchdog
+        //                                   (audio_input の AEC FFT が CPU 0 食い切り)
+        //  - speaking 限定 10ms           → IDLE1 (CPU 1) watchdog
+        //                                   (stackchan_update_task が CPU 1 食い切り)
+        // 着地: 全 non-idle state で 33ms。実効 ~19Hz、speaking を含む全 state で
+        // audio task に CPU を譲る間隔を確保。listening 中の servo motion は
+        // upstream の 9Hz よりは改善 (19Hz)。完全な smoothness は servo update
+        // を専用 high-priority task に分離する必要あり (将来検討)。
         if (!hal_bridge::is_xiaozhi_idle()) {
-            vTaskDelay(pdMS_TO_TICKS(100));
+            vTaskDelay(pdMS_TO_TICKS(33));
         }
 
         GetStackChan().update();
