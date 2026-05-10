@@ -27,7 +27,11 @@ static const char* _tag = "SkinLoader";
 // を容易にしつつ、transient な ~1s 級失敗は救う。
 namespace {
 constexpr int     MAX_FILE_RETRIES   = 3;
-constexpr int     RETRY_DELAY_MS     = 50;
+// GOB fork: SD card 内部 GC / wear-leveling は数百 ms〜数 s かかるため、50ms
+// では復帰機会を見逃す。実機で 0x107 (ESP_ERR_TIMEOUT) を捉えた診断ログ
+// (`sdmmc_send_cmd` 1 秒タイムアウトが 3 回連続) から、500ms backoff に拡大。
+// 合計待ち時間: 3 × 1s (cmd timeout) + 2 × 0.5s (backoff) = 約 4 秒。
+constexpr int     RETRY_DELAY_MS     = 500;
 constexpr int64_t SLOW_OPEN_WARN_US  = 100 * 1000;
 constexpr int64_t SLOW_READ_WARN_US  = 200 * 1000;
 }  // namespace
