@@ -158,6 +158,7 @@ void Hal::tickSntpRtcSyncIfPending()
 /* -------------------------------------------------------------------------- */
 #include "board/hal_bridge.h"
 #include <stackchan/stackchan.h>
+#include <stackchan/gob_fork/error_toast.h>
 #include <apps/common/common.h>
 #include <assets/assets.h>
 
@@ -166,6 +167,9 @@ void Hal::xiaozhi_board_init()
     mclog::tagInfo(_tag, "xiaozhi board init");
 
     hal_bridge::xiaozhi_board_init();
+
+    // GOB fork: ESP_LOGE hook を設置 (NVS の error_toast=ON で有効)。
+    stackchan::gob_fork::error_toast::init();
 }
 
 static void _stackchan_update_task(void* param)
