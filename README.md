@@ -1,44 +1,98 @@
 # StackChan GOB fork
 
-> ## $\color{red}{\textsf{重要 / IMPORTANT}}$
+> ## $\color{blue}{\textsf{推奨 / Recommended}}$
 >
-> 本 fork ファームウェア (GOB fork) を書き込んだ後、**M5Burner 等で公式ファームウェアに書き戻すと、Wi-Fi / xiaozhi 接続情報など各種設定がリセットされ、再設定が必要** になります (M5Burner の書き込みが NVS partition も上書きするため)。
+> 本 fork (GOB fork) と公式ファームウェアを行き来する際、**公式ファームウェアの書き戻し (M5Burner 等)** や **NVS partition の事故的破損** により、Wi-Fi / xiaozhi 接続情報など各種設定がリセットされる可能性があります。あらかじめ NVS partition (16 KB, offset 0x9000) のバックアップを取っておくことを推奨します。
 >
-> ### 設定を引き継ぎたい場合 (実機検証済み)
->
-> 書き戻し前に NVS partition (16 KB) を退避し、書き戻し後に復元することで、Wi-Fi / WSS / MQTT 等の xiaozhi 設定をそのまま引き継げます。`esptool.py` 必須。
+> ### バックアップ / リストア手順
 >
 > ```bash
-> # 1. 公式焼く前に NVS 退避
+> # バックアップ (任意のタイミング、書き込み前推奨)
 > esptool.py --port /dev/tty.usbmodemXXXX --baud 460800 read_flash 0x9000 0x4000 nvs_backup.bin
 >
-> # 2. M5Burner で公式 firmware を焼く (通常通り Start)
->
-> # 3. NVS 復元 (自動リセット)
+> # リストア (設定が消えた / 壊れたとき)
 > esptool.py --port /dev/tty.usbmodemXXXX --baud 460800 write_flash 0x9000 nvs_backup.bin
 > ```
 >
-> なお、**公式 → fork 方向 (`idf.py flash` 等での書き込み) では NVS は自動的に引き継がれます** (app partition のみ書き換わり、NVS partition は触れないため)。退避/復元手順が必要なのは fork → 公式 (M5Burner 経由) のときのみです。
+> なお、**公式 → fork 方向 (`idf.py flash` 等) では NVS は自動的に引き継がれます** (app partition のみ書き換わるため)。バックアップが特に効くのは fork → 公式 (M5Burner 経由) や NVS が破損したケースです。
 >
 > ---
 >
-> After flashing this fork (GOB fork) firmware, **re-flashing the official firmware via M5Burner (or similar tools) wipes Wi-Fi / xiaozhi connection settings and requires re-configuration** (M5Burner overwrites the NVS partition).
+> When switching between this fork (GOB fork) and the official firmware, settings such as Wi-Fi and xiaozhi connection info may be lost — either via M5Burner re-flashing the official firmware (which overwrites NVS) or via accidental NVS partition corruption. We recommend backing up the NVS partition (16 KB at offset 0x9000) in advance.
 >
-> ### To preserve settings (verified on real hardware)
->
-> Dump the NVS partition (16 KB) before re-flashing and restore it afterwards. Wi-Fi / WSS / MQTT and other xiaozhi settings carry over. Requires `esptool.py`.
+> ### Backup / Restore
 >
 > ```bash
-> # 1. Backup NVS before flashing
+> # Backup (any time; recommended before flashing)
 > esptool.py --port /dev/tty.usbmodemXXXX --baud 460800 read_flash 0x9000 0x4000 nvs_backup.bin
 >
-> # 2. Flash the official firmware via M5Burner (normal Start)
->
-> # 3. Restore NVS (auto-resets)
+> # Restore (when settings are lost or NVS is corrupted)
 > esptool.py --port /dev/tty.usbmodemXXXX --baud 460800 write_flash 0x9000 nvs_backup.bin
 > ```
 >
-> Note that **the official → fork direction (e.g. `idf.py flash`) preserves NVS automatically** because only the app partition is rewritten while the NVS partition is untouched. The backup/restore steps above are only needed in the fork → official direction (via M5Burner).
+> Note that the **official → fork direction (e.g. `idf.py flash`) preserves NVS automatically** because only the app partition is rewritten. The backup matters mainly for the fork → official direction (via M5Burner) or NVS corruption recovery.
+
+## ビルド前の注意 / Pre-build Notes
+
+GOB fork をビルドする前に以下を実施してください。
+
+### 1. `firmware/fetch_repos.py` の実行
+
+外部依存 (xiaozhi-esp32 等) を取得し、本 fork が必要とする patch を適用します。
+
+```bash
+cd firmware
+python3 ./fetch_repos.py
+```
+
+必要なタイミング:
+- 初回 clone 後
+- `firmware/repos.json` または `firmware/patches/` 配下の patch を更新したとき
+- `firmware/xiaozhi-esp32/` を消してやり直したいとき
+
+### 2. `firmware/sdkconfig` の削除 (本 fork へ切替えた直後)
+
+本 fork は `sdkconfig.defaults` で **FATFS の Long File Name (LFN)** を有効化しています (公式は OFF)。`sdkconfig.defaults` は `firmware/sdkconfig` が**存在しないとき**だけ参照されるため、既存ビルド環境ではそのままだと反映されません。
+
+```bash
+rm firmware/sdkconfig
+```
+
+必要なタイミング:
+- 公式 → 本 fork へ切替えた直後 (LFN を含む defaults 変更を取り込むため)
+- `firmware/sdkconfig.defaults` を更新したとき
+- `idf.py fullclean` は `build/` のみ消すので `sdkconfig` は別途削除が必要
+
+---
+
+Before building this fork, please run the following.
+
+### 1. Run `firmware/fetch_repos.py`
+
+Fetches external deps (xiaozhi-esp32 etc.) and applies fork-specific patches.
+
+```bash
+cd firmware
+python3 ./fetch_repos.py
+```
+
+When required:
+- After the initial clone
+- After updating `firmware/repos.json` or any patch under `firmware/patches/`
+- When you want to wipe `firmware/xiaozhi-esp32/` and start over
+
+### 2. Delete `firmware/sdkconfig` (right after switching to this fork)
+
+This fork enables **FATFS Long File Name (LFN)** in `sdkconfig.defaults` (the official fork has it OFF). `sdkconfig.defaults` is only consulted when `firmware/sdkconfig` is **absent**, so an existing build env will not pick up the change unless you delete it.
+
+```bash
+rm firmware/sdkconfig
+```
+
+When required:
+- Right after switching from the official firmware to this fork
+- After modifying `firmware/sdkconfig.defaults`
+- Note: `idf.py fullclean` only wipes `build/`, so `sdkconfig` must be removed separately.
 
 ## GOB fork ドキュメント / Additional Docs
 
