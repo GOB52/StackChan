@@ -186,14 +186,13 @@ void DefaultSpeechBubble::renderAndPosition(size_t animated_chars)
     // 既存 anim をキャンセル (cancellation で completed_cb は発火しない)。
     lv_anim_delete(label_obj, _anim_set_x_cb);
 
-    // GOB fork: 親変更直後 (renderAsVanilla → renderAndPosition 遷移) は
-    // lv_obj_get_x が前 anchor (CENTER) の左端値を返したままだと anim が
-    // cur=−40 → target=0 のような誤った遷移を見せてしまう。
-    // layout を即時更新して新 anchor (LEFT_MID) 基準の cur_x (= 0) を反映してから
-    // anim を起動することで、滑らかな tail-follow を維持しつつジャンプも回避する。
-    if (parent_changed) {
-        lv_obj_update_layout(label_obj);
-    }
+    // GOB fork: setLongMode / setTextAlign / setAlign / setText / setWidth /
+    // setParent や、appendSpeech 側 just_cleared 経路の lv_obj_set_x(0) snap を
+    // 経由した直後は LVGL layout が即時更新されず lv_obj_get_x が古い値を返す
+    // (parent_changed 時は前 anchor の位置、tool indicator ↔ regular 切替の
+    // snap 直後は前 chunk 末尾位置)。anim の cur_x を正確に取るため毎回
+    // layout を強制更新する。
+    lv_obj_update_layout(label_obj);
 
     if (animated_chars == 0) {
         lv_obj_set_x(label_obj, target_x);
