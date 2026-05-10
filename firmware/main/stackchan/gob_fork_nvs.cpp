@@ -12,6 +12,7 @@ constexpr const char* _key_screensaver_to = "scr_timeout_s";
 constexpr const char* _key_nfc_enabled    = "nfc_enabled";
 constexpr const char* _key_time_24h       = "time_24h";
 constexpr const char* _key_bubble_fx      = "bubble_fx";
+constexpr const char* _key_error_toast    = "error_toast";
 
 }  // namespace
 
@@ -133,6 +134,26 @@ bool set_bubble_fx_enabled(const bool enabled)
     nvs_handle_t h = 0;
     if (nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h) != ESP_OK) return false;
     const bool ok = (nvs_set_u8(h, _key_bubble_fx, enabled ? 1 : 0) == ESP_OK)
+                    && (nvs_commit(h) == ESP_OK);
+    nvs_close(h);
+    return ok;
+}
+
+bool get_error_toast_enabled()
+{
+    nvs_handle_t h = 0;
+    if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &h) != ESP_OK) return true;  // default ON
+    uint8_t v = 1;  // default ON
+    nvs_get_u8(h, _key_error_toast, &v);  // ignore error: keep default
+    nvs_close(h);
+    return v != 0;
+}
+
+bool set_error_toast_enabled(const bool enabled)
+{
+    nvs_handle_t h = 0;
+    if (nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h) != ESP_OK) return false;
+    const bool ok = (nvs_set_u8(h, _key_error_toast, enabled ? 1 : 0) == ESP_OK)
                     && (nvs_commit(h) == ESP_OK);
     nvs_close(h);
     return ok;

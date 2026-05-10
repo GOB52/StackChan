@@ -51,4 +51,11 @@ bool        set_time_format_24h(const bool use24h);
 bool        get_bubble_fx_enabled();
 bool        set_bubble_fx_enabled(const bool enabled);
 
+// --- Error toast (NVS key: "error_toast") -----------------------------------
+// Default ON: ESP_LOGE from a TAG whitelist (MCP / MQTT / Application / OTA /
+// WifiStation) is surfaced as a red Toast on screen. Console output is
+// preserved. Throttled to 1 toast per TAG per second.
+bool        get_error_toast_enabled();
+bool        set_error_toast_enabled(const bool enabled);
+
 }  // namespace stackchan::gob_fork
