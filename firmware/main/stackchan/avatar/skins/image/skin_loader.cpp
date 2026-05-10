@@ -9,6 +9,9 @@
 #include <fmt/format.h>
 #include <esp_heap_caps.h>
 #include <esp_timer.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <cerrno>
 #include <cstdio>
 #include <cstring>
 #include <unordered_map>
@@ -18,12 +21,29 @@ namespace stackchan::avatar::image {
 static const char* _tag = "SkinLoader";
 
 // ---- File I/O (SD only) -------------------------------------------------------
-static bool read_text_file(const std::string& path, std::string& out, std::string& err)
+// GOB fork: AI Agent 起動時に稀発する SD 一過性 fopen 失敗 (xiaozhi 並走中の SPI3
+// バス瞬断 / カード内部 GC 等が疑われる) への対策。fopen/fread を最大 3 回まで
+// retry し、各試行で経過時間と errno を診断ログに残す。次回再発時の根本原因特定
+// を容易にしつつ、transient な ~1s 級失敗は救う。
+namespace {
+constexpr int     MAX_FILE_RETRIES   = 3;
+constexpr int     RETRY_DELAY_MS     = 50;
+constexpr int64_t SLOW_OPEN_WARN_US  = 100 * 1000;
+constexpr int64_t SLOW_READ_WARN_US  = 200 * 1000;
+}  // namespace
+
+static bool read_text_file_once(const std::string& path, std::string& out, std::string& err)
 {
+    const int64_t t_open0 = esp_timer_get_time();
     FILE* f = fopen(path.c_str(), "r");
+    const int64_t t_open_us = esp_timer_get_time() - t_open0;
     if (!f) {
-        err = fmt::format("fopen failed: {}", path);
+        const int e = errno;
+        err = fmt::format("fopen failed (errno={} {}): {}", e, std::strerror(e), path);
         return false;
+    }
+    if (t_open_us > SLOW_OPEN_WARN_US) {
+        mclog::tagWarn(_tag, "  slow fopen ({} ms): {}", t_open_us / 1000, path);
     }
     fseek(f, 0, SEEK_END);
     const long sz = ftell(f);
@@ -34,22 +54,55 @@ static bool read_text_file(const std::string& path, std::string& out, std::strin
         return false;
     }
     out.resize(static_cast<size_t>(sz));
+    const int64_t t_read0 = esp_timer_get_time();
     size_t got = fread(out.data(), 1, static_cast<size_t>(sz), f);
+    const int64_t t_read_us = esp_timer_get_time() - t_read0;
+    const int read_errno = (got != static_cast<size_t>(sz)) ? errno : 0;
     fclose(f);
     if (got != static_cast<size_t>(sz)) {
-        err = fmt::format("fread short: got {}/{} from {}", got, sz, path);
+        err = fmt::format("fread short: got {}/{} (errno={} {}) from {}",
+                          got, sz, read_errno, std::strerror(read_errno), path);
         return false;
+    }
+    if (t_read_us > SLOW_READ_WARN_US) {
+        mclog::tagWarn(_tag, "  slow fread ({} ms, {} bytes): {}", t_read_us / 1000, sz, path);
     }
     return true;
 }
 
-// Load entire PNG file into a PSRAM-backed buffer.
-static bool read_png_file(const std::string& path, PngBuffer& out, std::string& err)
+static bool read_text_file(const std::string& path, std::string& out, std::string& err)
 {
+    for (int attempt = 1; attempt <= MAX_FILE_RETRIES; ++attempt) {
+        std::string this_err;
+        if (read_text_file_once(path, out, this_err)) {
+            if (attempt > 1) {
+                mclog::tagWarn(_tag, "read_text_file recovered on attempt {}: {}", attempt, path);
+            }
+            return true;
+        }
+        err = this_err;
+        if (attempt < MAX_FILE_RETRIES) {
+            mclog::tagWarn(_tag, "read_text_file attempt {} failed ({}); retry after {}ms",
+                           attempt, this_err, RETRY_DELAY_MS);
+            vTaskDelay(pdMS_TO_TICKS(RETRY_DELAY_MS));
+        }
+    }
+    return false;
+}
+
+// Load entire PNG file into a PSRAM-backed buffer.
+static bool read_png_file_once(const std::string& path, PngBuffer& out, std::string& err)
+{
+    const int64_t t_open0 = esp_timer_get_time();
     FILE* f = fopen(path.c_str(), "rb");
+    const int64_t t_open_us = esp_timer_get_time() - t_open0;
     if (!f) {
-        err = fmt::format("fopen failed: {}", path);
+        const int e = errno;
+        err = fmt::format("fopen failed (errno={} {}): {}", e, std::strerror(e), path);
         return false;
+    }
+    if (t_open_us > SLOW_OPEN_WARN_US) {
+        mclog::tagWarn(_tag, "  slow fopen ({} ms): {}", t_open_us / 1000, path);
     }
     fseek(f, 0, SEEK_END);
     const long sz = ftell(f);
@@ -66,17 +119,45 @@ static bool read_png_file(const std::string& path, PngBuffer& out, std::string& 
         fclose(f);
         return false;
     }
+    const int64_t t_read0 = esp_timer_get_time();
     size_t got = fread(raw, 1, static_cast<size_t>(sz), f);
+    const int64_t t_read_us = esp_timer_get_time() - t_read0;
+    const int read_errno = (got != static_cast<size_t>(sz)) ? errno : 0;
     fclose(f);
     if (got != static_cast<size_t>(sz)) {
         heap_caps_free(raw);
-        err = fmt::format("fread short: got {}/{} from {}", got, sz, path);
+        err = fmt::format("fread short: got {}/{} (errno={} {}) from {}",
+                          got, sz, read_errno, std::strerror(read_errno), path);
         return false;
+    }
+    if (t_read_us > SLOW_READ_WARN_US) {
+        mclog::tagWarn(_tag, "  slow fread ({} ms, {} bytes): {}", t_read_us / 1000, sz, path);
     }
     out.bytes.reset(raw);
     out.size = static_cast<size_t>(sz);
     mclog::tagInfo(_tag, "  PNG: {} ({} bytes)", path, sz);
     return true;
+}
+
+static bool read_png_file(const std::string& path, PngBuffer& out, std::string& err)
+{
+    for (int attempt = 1; attempt <= MAX_FILE_RETRIES; ++attempt) {
+        std::string this_err;
+        if (read_png_file_once(path, out, this_err)) {
+            if (attempt > 1) {
+                mclog::tagWarn(_tag, "read_png_file recovered on attempt {}: {}", attempt, path);
+            }
+            return true;
+        }
+        err = this_err;
+        // PSRAM 解放は read_png_file_once 内で完了済み (out.bytes は未代入)
+        if (attempt < MAX_FILE_RETRIES) {
+            mclog::tagWarn(_tag, "read_png_file attempt {} failed ({}); retry after {}ms",
+                           attempt, this_err, RETRY_DELAY_MS);
+            vTaskDelay(pdMS_TO_TICKS(RETRY_DELAY_MS));
+        }
+    }
+    return false;
 }
 
 // ---- Enum parsers -------------------------------------------------------------
