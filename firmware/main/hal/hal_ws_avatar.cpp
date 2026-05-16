@@ -128,7 +128,7 @@ public:
 
         _websocket->OnDisconnected([this]() {
             ESP_LOGI(_tag.c_str(), "Disconnected!");
-            GetHAL().onWsLog.emit(CommonLogLevel::Error, "Server disconnected");
+            // GetHAL().onWsLog.emit(CommonLogLevel::Error, "Server disconnected");
         });
 
         _websocket->OnData([this](const char* data, size_t len, bool binary) {

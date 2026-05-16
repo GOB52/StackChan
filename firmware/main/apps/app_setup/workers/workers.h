@@ -9,6 +9,7 @@
 #include <uitk/short_namespace.hpp>
 #include <hal/hal.h>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string_view>
 
@@ -266,6 +267,34 @@ private:
  * @brief
  *
  */
+class XiaozhiPowerSavingWorker : public WorkerBase {
+public:
+    XiaozhiPowerSavingWorker();
+    void update() override;
+
+private:
+    void update_idle_label();
+
+    std::unique_ptr<uitk::lvgl_cpp::Container> _panel;
+    std::unique_ptr<uitk::lvgl_cpp::Container> _panel_idle_shutdown;
+    std::unique_ptr<uitk::lvgl_cpp::Container> _panel_charging;
+    std::unique_ptr<uitk::lvgl_cpp::Label> _label_idle_title;
+    std::unique_ptr<uitk::lvgl_cpp::Label> _label_idle_value;
+    std::unique_ptr<uitk::lvgl_cpp::Slider> _slider_idle_shutdown;
+    std::unique_ptr<uitk::lvgl_cpp::Label> _label_charging_title;
+    std::unique_ptr<uitk::lvgl_cpp::Switch> _switch_charging;
+    std::unique_ptr<uitk::lvgl_cpp::Button> _btn_confirm;
+
+    XiaozhiConfig_t _config;
+    std::vector<uint32_t> _idle_shutdown_levels;
+    int32_t _pending_idle_index = -1;
+    bool _confirm_flag          = false;
+};
+
+/**
+ * @brief
+ *
+ */
 class TimezoneWorker : public WorkerBase {
 public:
     TimezoneWorker();
@@ -286,7 +315,7 @@ private:
  */
 class FactoryResetWorker : public WorkerBase {
 public:
-    FactoryResetWorker();
+    FactoryResetWorker(std::function<void()> beforeResetAction = {});
     ~FactoryResetWorker();
     void update() override;
 
@@ -300,6 +329,7 @@ private:
     int _confirm_count = 0;
     bool _cancel_flag  = false;
     bool _confirm_flag = false;
+    std::function<void()> _before_reset_action;
 
     void update_ui();
 };

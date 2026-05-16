@@ -3,8 +3,36 @@
 #include <esp_log.h>
 #include <driver/i2c_master.h>
 #include <driver/i2s_tdm.h>
+#include <atomic>
+#include "../hal.h"  // GOB fork: Hal::setAudioInitBusy() for FT6336 / ES7210 I2C arbitration
 
 #define TAG "CoreS3AudioCodec"
+
+namespace {
+// GOB fork: True while ES7210/AW88298 init is running esp_codec_dev_open.
+// FT6336 touchpad esp_timer (core 0) checks Hal::isAudioInitBusy() and skips
+// its 20ms poll to avoid I2C bus contention. Without this, the ~120ms ES7210
+// register init window collides with touchpad polls roughly 6 times, and any
+// failed critical transaction returns ESP_ERR_NOT_SUPPORTED → abort.
+std::atomic<bool> _audio_init_busy{false};
+
+// RAII helper: ensures flag is cleared even if ESP_ERROR_CHECK aborts (which
+// kills the task anyway, but keeps the API symmetric for non-abort paths).
+struct AudioInitGuard {
+    AudioInitGuard()  { Hal::setAudioInitBusy(true); }
+    ~AudioInitGuard() { Hal::setAudioInitBusy(false); }
+};
+}  // namespace
+
+bool Hal::isAudioInitBusy()
+{
+    return _audio_init_busy.load(std::memory_order_acquire);
+}
+
+void Hal::setAudioInitBusy(bool busy)
+{
+    _audio_init_busy.store(busy, std::memory_order_release);
+}
 
 CoreS3AudioCodec::CoreS3AudioCodec(void* i2c_master_handle, int input_sample_rate, int output_sample_rate,
     gpio_num_t mclk, gpio_num_t bclk, gpio_num_t ws, gpio_num_t dout, gpio_num_t din,
@@ -202,9 +230,15 @@ void CoreS3AudioCodec::EnableInput(bool enable) {
         if (input_reference_) {
             fs.channel_mask |= ESP_CODEC_DEV_MAKE_CHANNEL_MASK(1);
         }
-        ESP_ERROR_CHECK(esp_codec_dev_open(input_dev_, &fs));
+        // GOB fork: protect the I2C-heavy ES7210 register init window from
+        // FT6336 touchpad poll (20ms periodic) on the shared I2C bus.
+        {
+            AudioInitGuard guard;
+            ESP_ERROR_CHECK(esp_codec_dev_open(input_dev_, &fs));
+        }
         ESP_ERROR_CHECK(esp_codec_dev_set_in_channel_gain(input_dev_, ESP_CODEC_DEV_MAKE_CHANNEL_MASK(0), input_gain_));
     } else {
+        AudioInitGuard guard;
         ESP_ERROR_CHECK(esp_codec_dev_close(input_dev_));
     }
     AudioCodec::EnableInput(enable);
@@ -223,9 +257,15 @@ void CoreS3AudioCodec::EnableOutput(bool enable) {
             .sample_rate = (uint32_t)output_sample_rate_,
             .mclk_multiple = 0,
         };
-        ESP_ERROR_CHECK(esp_codec_dev_open(output_dev_, &fs));
+        // GOB fork: same I2C arbitration as EnableInput. AW88298 (output amp)
+        // shares the I2C bus with FT6336 / ES7210 / AW9523 / AXP2101 / BMI270.
+        {
+            AudioInitGuard guard;
+            ESP_ERROR_CHECK(esp_codec_dev_open(output_dev_, &fs));
+        }
         ESP_ERROR_CHECK(esp_codec_dev_set_out_vol(output_dev_, output_volume_));
     } else {
+        AudioInitGuard guard;
         ESP_ERROR_CHECK(esp_codec_dev_close(output_dev_));
     }
     AudioCodec::EnableOutput(enable);

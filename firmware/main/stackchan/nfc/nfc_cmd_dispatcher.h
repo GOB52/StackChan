@@ -4,6 +4,7 @@
 // dispatches to per-command handlers. Handlers are thin wrappers around the
 // shared actions/ layer (same code path as `self.robot.*` MCP tools).
 #pragma once
+#include <sdkconfig.h>
 #include <ArduinoJson.hpp>
 #include <functional>
 #include <map>

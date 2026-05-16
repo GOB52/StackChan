@@ -6,7 +6,9 @@
 // Modified by GOB (X:@GOB_52_GOB / GitHub:GOB52) - StackChan firmware fork
 #include "hal.h"
 #include "board/sd_guard.h"
+#if CONFIG_GOB_FORK_ENABLE_NFC
 #include "../stackchan/nfc/nfc_cmd_dispatcher.h"
+#endif
 #include <memory>
 #include <mooncake_log.h>
 #include <nvs_flash.h>
@@ -63,6 +65,7 @@ void Hal::init()
 #include <esp_ota_ops.h>
 #include <esp_system.h>
 #include <esp_timer.h>
+#include <esp_log.h>
 #include <esp_mac.h>
 
 void Hal::delay(std::uint32_t ms)
@@ -157,6 +160,7 @@ void Hal::tickSntpRtcSyncIfPending()
 /* -------------------------------------------------------------------------- */
 #include "board/hal_bridge.h"
 #include <stackchan/stackchan.h>
+#include <stackchan/gob_fork/error_toast.h>
 #include <apps/common/common.h>
 #include <assets/assets.h>
 
@@ -165,24 +169,45 @@ void Hal::xiaozhi_board_init()
     mclog::tagInfo(_tag, "xiaozhi board init");
 
     hal_bridge::xiaozhi_board_init();
+
+    // GOB fork: ESP_LOGE hook を設置 (NVS の error_toast=ON で有効)。
+    stackchan::gob_fork::error_toast::init();
 }
 
 static void _stackchan_update_task(void* param)
 {
-    bool is_xiaozhi_ready = false;
-    bool is_setup_done    = false;
+    bool is_setup_done = false;
 
     while (1) {
-        vTaskDelay(pdMS_TO_TICKS(10));
+        vTaskDelay(pdMS_TO_TICKS(20));
 
         tools::update_reminders();
 
         LvglLockGuard lock;
 
+        // GOB fork: speaking 中は upstream 互換 100ms に戻す (audio プチノイズ対策)。
+        // それ以外の non-idle (listening / connecting 等) は 33ms を維持し、
+        // servo motion / status bar の smoothness を確保する。
+        //
+        // 経緯 (実機試行ログ):
+        //  - 0ms (撤去)                   → speaking 中 audio プチノイズ発生
+        //  - speaking 限定 100ms          → わずかにプチノイズ残存
+        //  - speaking 限定 25ms           → IDLE0 (CPU 0) watchdog
+        //                                   (audio_input の AEC FFT が CPU 0 食い切り)
+        //  - speaking 限定 10ms           → IDLE1 (CPU 1) watchdog
+        //                                   (stackchan_update_task が CPU 1 食い切り)
+        //  - 全 non-idle 33ms             → FX OFF (SCROLL_CIRCULAR 連続 refresh) と
+        //                                   重なるとプチノイズ顕著
+        // 現状: speaking のみ 100ms (upstream 準拠)、他 non-idle 33ms。
+        if (hal_bridge::is_xiaozhi_speaking()) {
+            vTaskDelay(pdMS_TO_TICKS(100));
+        } else if (!hal_bridge::is_xiaozhi_idle()) {
+            vTaskDelay(pdMS_TO_TICKS(33));
+        }
+
         GetStackChan().update();
 
-        if (!is_xiaozhi_ready) {
-            is_xiaozhi_ready = hal_bridge::is_xiaozhi_ready();
+        if (!hal_bridge::is_xiaozhi_ready()) {
             continue;
         }
 
@@ -191,11 +216,13 @@ static void _stackchan_update_task(void* param)
             GetHAL().startSntp();
             view::create_home_indicator([]() { GetHAL().requestWarmReboot(0); }, 0x81DBBD, 0x134233);
             view::create_status_bar(0x81DBBD, 0x134233);
+#if CONFIG_GOB_FORK_ENABLE_NFC
             // GOB fork: NFC を遅延初期化 (audio codec init を妨げないため)
             GetHAL().startNfc();
             // GOB fork: stackchan:cmd dispatcher を起動。NFC opt-out 時でも
             // 害はない (signal が emit されないだけ) ので無条件で初期化。
             stackchan::nfc::CmdDispatcher::initOnce();
+#endif
             is_setup_done = true;
         }
 
@@ -225,9 +252,26 @@ void Hal::startXiaozhi()
     });
 
     // Start stackchan update task
-    xTaskCreatePinnedToCore(_stackchan_update_task, "stackchan", 4096, NULL, 5, NULL, 1);
+    xTaskCreatePinnedToCore(_stackchan_update_task, "stackchan", 4096, NULL, 3, NULL, 1);
 
     hal_bridge::start_xiaozhi_app();
+}
+
+XiaozhiConfig_t Hal::getXiaozhiConfig()
+{
+    auto bridge_config = hal_bridge::get_xiaozhi_config();
+    return XiaozhiConfig_t{
+        .idleShutdownTimeSeconds   = bridge_config.idleShutdownTimeSeconds,
+        .allowShutdownWhenCharging = bridge_config.allowShutdownWhenCharging,
+    };
+}
+
+void Hal::setXiaozhiConfig(XiaozhiConfig_t config)
+{
+    hal_bridge::set_xiaozhi_config({
+        .idleShutdownTimeSeconds   = config.idleShutdownTimeSeconds,
+        .allowShutdownWhenCharging = config.allowShutdownWhenCharging,
+    });
 }
 
 uint8_t Hal::getBatteryLevel()

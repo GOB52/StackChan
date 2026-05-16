@@ -3,12 +3,15 @@
  *
  * SPDX-License-Identifier: MIT
  */
+// Modified by GOB (X:@GOB_52_GOB / GitHub:GOB52) - StackChan firmware fork
 #pragma once
 #include <display/lvgl_display/lvgl_display.h>
 #include <esp_lcd_panel_io.h>
 #include <esp_lcd_panel_ops.h>
 #include <esp_timer.h>
+#include <deque>
 #include <memory>
+#include <string>
 
 class StackChanAvatarDisplay : public LvglDisplay {
 private:
@@ -23,6 +26,17 @@ private:
     lv_obj_t* preview_image_                         = nullptr;
     esp_timer_handle_t preview_timer_                = nullptr;
     std::unique_ptr<LvglImage> preview_image_cached_ = nullptr;
+
+    // GOB fork: long-sentence segmentation queue.
+    // assistant chunk を句読点で split して順次 appendSpeech に流す。
+    // segment 間 delay は字数 × 200ms (TTS rate ~5 chars/sec 想定)。
+    std::deque<std::string> segment_queue_;
+    lv_timer_t* segment_timer_ = nullptr;
+
+    void enqueueAssistantChunks(const std::string& content);
+    void dispatchNextSegmentLocked();
+    void clearSegmentQueue();
+    static void onSegmentTimer(lv_timer_t* t);
 
 protected:
     virtual bool Lock(int timeout_ms = 0) override;

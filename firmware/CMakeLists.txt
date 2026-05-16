@@ -12,7 +12,7 @@ cmake_minimum_required(VERSION 3.16)
 # Partition rollback validity is confirmed independently in hal.cpp 20s after
 # boot (esp_ota_mark_app_valid_cancel_rollback), so skipping the xiaozhi-side
 # MarkCurrentVersionValid is safe.
-set(GOB_FORK_DISPLAY_VERSION "1.2.4-gob")
+set(GOB_FORK_DISPLAY_VERSION "1.3.0-gob")
 set(PROJECT_VER "99.0.0")
 add_definitions(-DFIRMWARE_VERSION=\"${GOB_FORK_DISPLAY_VERSION}\")
 

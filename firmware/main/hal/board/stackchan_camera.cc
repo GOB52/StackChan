@@ -394,6 +394,19 @@ void StackChanCamera::SetExplainUrl(const std::string& url, const std::string& t
 
 bool StackChanCamera::Capture()
 {
+    // GOB fork: 後段 Explain() の encoder_thread (image_to_jpeg_cb) が
+    // internal DRAM 約 8 KB + std::thread / HTTP / mbedtls スパイクで合計
+    // ~16 KB を要求するため、撮影前にここで弾いて、撮影 → encode 失敗 →
+    // HTTP block → 表示 hang の連鎖を回避する。例外不使用、bool false で
+    // upstream の既存 abort パス (xiaozhi mcp_server.cc:115) に乗せる。
+    constexpr size_t MIN_FREE_INTERNAL_BYTES = 16 * 1024;
+    const size_t free_internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+    if (free_internal < MIN_FREE_INTERNAL_BYTES) {
+        ESP_LOGE(TAG, "Capture aborted: internal DRAM low (free=%u, need>=%u)",
+                 (unsigned)free_internal, (unsigned)MIN_FREE_INTERNAL_BYTES);
+        return false;
+    }
+
     if (encoder_thread_.joinable()) {
         encoder_thread_.join();
     }
@@ -1026,15 +1039,20 @@ bool StackChanCamera::SetVFlip(bool enabled)
  */
 std::string StackChanCamera::Explain(const std::string& question)
 {
+    // GOB fork: 例外を投げず ESP_LOGE + 空文字 return で abort する
+    // (組込み環境での stack unwind / exception table コスト回避、加えて
+    // 実機で例外発生時に LVGL / mooncake 任せの上位 catch がうまく動かず
+    // 吹き出し固まり + LED 青固定 + タッチ無反応の完全 hang に至るため)。
     if (explain_url_.empty()) {
-        throw std::runtime_error("Image explain URL or token is not set");
+        ESP_LOGE(TAG, "Explain aborted: URL or token not set");
+        return "";
     }
 
     // 创建局部的 JPEG 队列, 40 entries is about to store 512 * 40 = 20480 bytes of JPEG data
     QueueHandle_t jpeg_queue = xQueueCreate(40, sizeof(JpegChunk));
     if (jpeg_queue == nullptr) {
         ESP_LOGE(TAG, "Failed to create JPEG queue");
-        throw std::runtime_error("Failed to create JPEG queue");
+        return "";
     }
 
     // We spawn a thread to encode the image to JPEG using optimized encoder (cost about 500ms and 8KB SRAM)
@@ -1050,7 +1068,7 @@ std::string StackChanCamera::Explain(const std::string& question)
                 if (index == 0 && data != nullptr && len > 0) {
                     chunk.data = (uint8_t*)heap_caps_aligned_alloc(16, len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
                     if (chunk.data == nullptr) {
-                        ESP_LOGE(TAG, "Failed to allocate %zu bytes for JPEG chunk", len);
+                        ESP_LOGE(TAG, "Failed to allocate %u bytes for JPEG chunk", (unsigned)len);
                         chunk.len = 0;
                     } else {
                         memcpy(chunk.data, data, len);
@@ -1071,6 +1089,12 @@ std::string StackChanCamera::Explain(const std::string& question)
 
     auto network = Board::GetInstance().GetNetwork();
     auto http    = network->CreateHttp(3);
+    // GOB fork: 既定 timeout 30s は MCP tool の同期実行と相まって、server 応答
+    // 遅延時に Application タスクを長時間 block し、後続 assistant chunk が
+    // StackChan の表示まで届かない hang 状態を生む。10s に短縮して失敗時の
+    // 体感時間と表示停滞を抑える (cleanup の receive task exit 待ちで実時間は
+    // もう少し延びる)。
+    http->SetTimeout(10 * 1000);
     // 构造multipart/form-data请求体
     std::string boundary = "----ESP32_CAMERA_BOUNDARY";
 
@@ -1095,7 +1119,7 @@ std::string StackChanCamera::Explain(const std::string& question)
             }
         }
         vQueueDelete(jpeg_queue);
-        throw std::runtime_error("Failed to connect to explain URL");
+        return "";
     }
 
     {
@@ -1141,7 +1165,8 @@ std::string StackChanCamera::Explain(const std::string& question)
 
     if (!saw_terminator || total_sent == 0) {
         ESP_LOGE(TAG, "JPEG encoder failed or produced empty output");
-        throw std::runtime_error("Failed to encode image to JPEG");
+        http->Close();
+        return "";
     }
 
     {
@@ -1155,7 +1180,8 @@ std::string StackChanCamera::Explain(const std::string& question)
 
     if (http->GetStatusCode() != 200) {
         ESP_LOGE(TAG, "Failed to upload photo, status code: %d", http->GetStatusCode());
-        throw std::runtime_error("Failed to upload photo");
+        http->Close();
+        return "";
     }
 
     std::string result = http->ReadAll();

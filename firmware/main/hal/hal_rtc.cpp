@@ -11,6 +11,7 @@
 #include <sys/time.h>
 #include <ctime>
 #include <settings.h>
+#include <esp_log.h>
 
 static const std::string_view _tag = "HAL-RTC";
 
@@ -103,10 +104,10 @@ void Hal::syncSystemTimeToRtc()
     time.seconds = tm_curr.tm_sec;
 
     if (_pcf8563->setDateTime(&date, &time)) {
-        mclog::tagInfo(_tag, "system synced to rtc (UTC): {:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}", date.year,
-                       date.month, date.date, time.hours, time.minutes, time.seconds);
+        ESP_LOGI(_tag.data(), "system synced to rtc (UTC): %04d-%02d-%02d %02d:%02d:%02d", date.year, date.month,
+                 date.date, time.hours, time.minutes, time.seconds);
     } else {
-        mclog::tagError(_tag, "failed to write rtc");
+        ESP_LOGE(_tag.data(), "failed to write rtc");
     }
 }
 

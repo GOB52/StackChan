@@ -9,6 +9,10 @@
 // Poll task is split into helper functions:
 //   poll_once -> process_picc -> read_ndef_with_retry / parse_tlvs_and_collect
 #include "hal.h"
+
+#if CONFIG_GOB_FORK_ENABLE_NFC
+#pragma message "[GOB Fork] CONFIG_GOB_FORK_ENABLE_NFC=y"
+
 #include "board/hal_bridge.h"
 #include "../stackchan/gob_fork_nvs.h"
 #include <freertos/FreeRTOS.h>
@@ -295,3 +299,5 @@ void Hal::nfc_init()
     // patch (SW1), so core 1 is safe.
     xTaskCreatePinnedToCore(_nfc_task, "nfc", 6144, NULL, 1, NULL, 1);
 }
+
+#endif  // CONFIG_GOB_FORK_ENABLE_NFC

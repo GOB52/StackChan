@@ -1,5 +1,6 @@
 // StackChan firmware fork - new file by GOB (X:@GOB_52_GOB / GitHub:GOB52)
 #pragma once
+#include <sdkconfig.h>
 #include "../app_setup/view/view.h"
 #include "view/skin_browser_page.h"
 #include "view/system_info_page.h"
@@ -38,7 +39,9 @@ private:
         ResetNvs,         // clear NVS → AVATAR uses avatar.json's current
         UseDefaultAvatar, // NVS = "__default__" → AVATAR uses DefaultAvatar
         RestartDevice,    // GetHAL().reboot() (cold restart, returns to Launcher)
+#if CONFIG_GOB_FORK_ENABLE_NFC
         ToggleNfc,        // flip NVS nfc_enabled and reboot to apply
+#endif
     };
 
     Page _current_page    = Page::Main;

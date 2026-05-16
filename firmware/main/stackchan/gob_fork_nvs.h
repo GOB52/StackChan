@@ -1,5 +1,6 @@
 // StackChan firmware fork - new file by GOB (X:@GOB_52_GOB / GitHub:GOB52)
 #pragma once
+#include <sdkconfig.h>
 #include <cstdint>
 #include <string>
 
@@ -31,17 +32,37 @@ uint32_t    get_screensaver_timeout_s();
 // Persist screensaver timeout (seconds; 0 = Off). Returns true on success.
 bool        set_screensaver_timeout_s(const uint32_t s);
 
+#if CONFIG_GOB_FORK_ENABLE_NFC
 // --- NFC enable (NVS key: "nfc_enabled") ------------------------------------
 // Default OFF: UnitNFC poll task interferes with audio codec / DSP timing
 // on the shared I2C bus and causes AFE FEED ringbuffer overruns when running
 // alongside xiaozhi. Users opt in explicitly when they want NFC.
+// (Compiled out when CONFIG_GOB_FORK_ENABLE_NFC=n.)
 bool        get_nfc_enabled();
 bool        set_nfc_enabled(const bool enabled);
+#endif
 
 // --- Status bar time format (NVS key: "time_24h") ---------------------------
 // Default false (12H "3:45 PM" — matches upstream behavior).
 // true selects 24H "15:45".
 bool        get_time_format_24h();
 bool        set_time_format_24h(const bool use24h);
+
+// --- Speech bubble FX (NVS key: "bubble_fx") --------------------------------
+// Default ON: utterance accumulator + tail-follow scroll + 1-sec dismiss +
+// long-sentence segmentation. OFF falls back to upstream behavior (each
+// chunk replaces previous text).
+bool        get_bubble_fx_enabled();
+bool        set_bubble_fx_enabled(const bool enabled);
+
+#if CONFIG_GOB_FORK_ENABLE_ERROR_TOAST
+// --- Error toast (NVS key: "error_toast") -----------------------------------
+// Default ON: ESP_LOGE from a TAG whitelist (MCP / MQTT / Application / OTA /
+// WifiStation) is surfaced as a red Toast on screen. Console output is
+// preserved. Throttled to 1 toast per TAG per second.
+// (Compiled out when CONFIG_GOB_FORK_ENABLE_ERROR_TOAST=n.)
+bool        get_error_toast_enabled();
+bool        set_error_toast_enabled(const bool enabled);
+#endif
 
 }  // namespace stackchan::gob_fork

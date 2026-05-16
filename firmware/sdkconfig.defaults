@@ -9,6 +9,7 @@ CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
 CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_LANGUAGE_EN_US=y
 CONFIG_BOARD_TYPE_M5STACK_STACK_CHAN=y
+CONFIG_SEND_WAKE_WORD_DATA=n
 CONFIG_SR_WN_WN9_HISTACKCHAN_TTS3=y
 CONFIG_COMPILER_OPTIMIZATION_SIZE=y
 CONFIG_COMPILER_CXX_EXCEPTIONS=y
@@ -84,3 +85,9 @@ CONFIG_LV_BUILD_DEMOS=n
 # Mooncake apps (and the SD probe / skin_loader) run.
 CONFIG_FATFS_LFN_STACK=y
 CONFIG_FATFS_MAX_LFN=255
+
+# --- GOB Fork compile-time feature toggles ---
+# See main/Kconfig.projbuild for descriptions. Default values are also
+# enforced by Kconfig; listed here for visibility / quick toggle.
+CONFIG_GOB_FORK_ENABLE_ERROR_TOAST=n
+CONFIG_GOB_FORK_ENABLE_NFC=n

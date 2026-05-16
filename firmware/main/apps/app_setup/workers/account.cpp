@@ -120,8 +120,7 @@ void AccountWorker::update()
             mclog::tagInfo(_tag, "unbind clicked");
             _page_account.reset();
 
-            // Unbind account
-            {
+            _worker_reset = std::make_unique<FactoryResetWorker>([]() {
                 auto loading_page = std::make_unique<view::LoadingPage>(0xF6F6F6, 0x26206A);
                 GetHAL().lvglUnlock();
 
@@ -135,10 +134,7 @@ void AccountWorker::update()
                 }
 
                 GetHAL().lvglLock();
-            }
-
-            // Factory reset
-            _worker_reset = std::make_unique<FactoryResetWorker>();
+            });
         } else if (_page_account->isQuitClicked()) {
             mclog::tagInfo(_tag, "quit clicked");
             _is_done = true;
