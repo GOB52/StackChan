@@ -22,6 +22,7 @@ private:
     int idle_expression_modifier_id_    = -1;
     int blink_modifier_id_              = -1;
     bool is_sleeping_                   = false;
+    uint8_t idle_motion_level_          = 2;
 
     lv_obj_t* preview_image_                         = nullptr;
     esp_timer_handle_t preview_timer_                = nullptr;
@@ -37,6 +38,9 @@ private:
     void dispatchNextSegmentLocked();
     void clearSegmentQueue();
     static void onSegmentTimer(lv_timer_t* t);
+
+    // upstream v1.3.1: idle motion レベル別ファクトリ (idle_motion_level_ 参照)
+    void CreateIdleMotionModifier();
 
 protected:
     virtual bool Lock(int timeout_ms = 0) override;

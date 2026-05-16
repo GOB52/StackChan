@@ -101,6 +101,9 @@ void AppAvatar::onOpen()
         if (!skin.error_message.empty()) {
             skin_load_error = skin.error_message;
         }
+        // upstream v1.4.0: 画面クリックでダンス停止 (onRunning 内で _screen_clicked_flag を消費)。
+        // base Avatar の virtual getPanel() を介すので ImageAvatar / DefaultAvatar どちらでも動く。
+        skin.avatar->getPanel()->onClick().connect([&]() { _screen_clicked_flag = true; });
         GetStackChan().attachAvatar(std::move(skin.avatar));
     }
 
@@ -228,7 +231,10 @@ void AppAvatar::onOpen()
         LvglLockGuard lvgl_lock;
         auto sequence = stackchan::animation::parse_sequence_from_json(data.data());
         if (!sequence.empty()) {
-            GetStackChan().addModifier(std::make_unique<DanceModifier>(sequence));
+            if (_dance_modifier_id >= 0) {
+                GetStackChan().removeModifier(_dance_modifier_id);
+            }
+            _dance_modifier_id = GetStackChan().addModifier(std::make_unique<DanceModifier>(sequence));
         }
     });
 
@@ -289,6 +295,17 @@ void AppAvatar::onRunning()
         }
     }
 #endif
+
+    // upstream v1.4.0: ダンス再生中に画面クリックでダンス停止。
+    // _screen_clicked_flag は avatar->getPanel()->onClick() で set される。
+    if (_screen_clicked_flag) {
+        _screen_clicked_flag = false;
+        if (_dance_modifier_id >= 0) {
+            GetStackChan().removeModifier(_dance_modifier_id);
+            _dance_modifier_id = -1;
+            mclog::tagInfo(getAppInfo().name, "dance modifier removed");
+        }
+    }
 
     GetStackChan().update();
 

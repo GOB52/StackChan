@@ -142,6 +142,19 @@ struct UserAccountInfo_t {
 struct XiaozhiConfig_t {
     uint32_t idleShutdownTimeSeconds = 600;
     bool allowShutdownWhenCharging   = false;
+    uint8_t idleRandomMovementLevel  = 2;
+};
+
+/**
+ * @brief
+ *
+ */
+enum class MicTestStatus {
+    Starting = 0,
+    Recording,
+    Playing,
+    Done,
+    Failed,
 };
 
 /**
@@ -351,6 +364,9 @@ public:
     /* ---------------------------------- Audio --------------------------------- */
     void setSpeakerVolume(uint8_t volume, bool permanent = false);
     uint8_t getSpeakerVolume();
+    std::string startMicTest(std::function<void(MicTestStatus)> onStatusUpdate);
+    void getMicWaveformFrame(std::vector<int16_t>& data);
+    void clearupMicTest();
 
 private:
     bool _xiaozhi_start_requested = false;
